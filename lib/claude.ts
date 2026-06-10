@@ -117,7 +117,7 @@ export async function generateBriefText(
   } catch (err) {
     primaryProblem =
       err instanceof Anthropic.APIError
-        ? `API error ${err.status}: ${err.name}`
+        ? `API error ${err.status}: ${err.message}`
         : `error: ${(err as Error).message}`;
   }
   console.warn(
@@ -147,7 +147,7 @@ export async function generateBriefText(
   } catch (err) {
     const fallbackProblem =
       err instanceof Anthropic.APIError
-        ? `API error ${err.status}: ${err.name}`
+        ? `API error ${err.status}: ${err.message}`
         : `error: ${(err as Error).message}`;
     return {
       text: "",

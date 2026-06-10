@@ -9,14 +9,16 @@
  *  - interactive:    small, interactive, low-stakes tasks (subject-line variants,
  *                    admin summaries). Never used for the weekly brief itself.
  *
- * TODO before first API call: verify exact model ID strings against current Anthropic
- * docs (run /claude-api when building lib/claude.ts). IDs are env-overridable so a
- * correction is a .env.local change, not a code change.
+ * IDs verified against GET /v1/models with the project key on 2026-06-10:
+ * claude-fable-5 (Claude Fable 5), claude-opus-4-8 (Claude Opus 4.8) both available.
+ * Env-overridable, so any future change is a .env.local edit, not a code change.
+ * Cost lever if interactive usage grows: drop interactive to claude-sonnet-4-6
+ * or claude-haiku-4-5-20251001 (also verified available).
  */
 export const MODELS = {
   brief: process.env.MODEL_BRIEF ?? "claude-fable-5",
-  briefFallback: process.env.MODEL_BRIEF_FALLBACK ?? "claude-opus-4-5",
-  interactive: process.env.MODEL_INTERACTIVE ?? "claude-opus-4-5",
+  briefFallback: process.env.MODEL_BRIEF_FALLBACK ?? "claude-opus-4-8",
+  interactive: process.env.MODEL_INTERACTIVE ?? "claude-opus-4-8",
 } as const;
 
 export const BRIEF_GENERATION = {

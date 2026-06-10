@@ -33,7 +33,7 @@ A low-touch subscription micro-SaaS: a concise weekly macro & markets brief for 
 - **`MODELS.brief` = claude-fable-5, high effort** — the weekly summarisation batch job only. Long-context, structured inputs, stable cached system prompt (`prompts/fable-summariser.md`). Conservative max output tokens.
 - **`MODELS.interactive` = cheaper tier (e.g. Opus-class)** — small/interactive/low-stakes tasks: subject-line variants, admin summaries, glossary checks.
 - **Refusal/safety fallback:** detect refusal or safety-limited responses from the brief job → retry once on `MODELS.briefFallback` → if still failing, mark issue draft as `needs_review`, alert admin, **hold the send** (never auto-send a degraded brief).
-- All model IDs are env-overridable in `config/models.ts`. **Verify exact API model strings against current Anthropic docs before first call** — run `/claude-api` when building `lib/claude.ts` (it also bakes in prompt-caching best practice).
+- All model IDs are env-overridable in `config/models.ts`. **Verified 2026-06-10 via `GET /v1/models`:** `claude-fable-5` and `claude-opus-4-8` (fallback/interactive) are live on this account. Still run `/claude-api` when building `lib/claude.ts` — it bakes in prompt-caching and refusal-handling best practice.
 
 ## Architecture (one paragraph)
 

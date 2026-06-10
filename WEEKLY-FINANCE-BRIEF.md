@@ -12,6 +12,7 @@
 
 ## Standing items
 
-- Rotate `RESEND_API_KEY` (was pasted in chat); FRED/AlphaVantage lower priority. Supabase `sb_` keys also transited chat — rotatable in dashboard anytime.
-- `ANTHROPIC_API_KEY` still missing — hard blocker for M3 only.
+- All keys now in except `STRIPE_WEBHOOK_SECRET` (created during M2 webhook setup — nothing to fetch).
+- Anthropic key **validated** 2026-06-10; `claude-fable-5` + `claude-opus-4-8` confirmed live via `/v1/models`; routing config updated with verified IDs.
+- Rotation pass (keys transited chat): Resend (priority), Anthropic, Supabase `sb_` pair, FRED/AlphaVantage. Stripe = test mode, skip.
 - 2 moderate `npm audit` findings in scaffold deps — review at M4, don't `--force` fix.

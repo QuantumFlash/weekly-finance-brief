@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { WaitlistForm } from "@/components/WaitlistForm";
 
 export default function Home() {
@@ -5,9 +7,25 @@ export default function Home() {
     <div className="flex flex-1 flex-col bg-zinc-50 font-sans text-zinc-900 dark:bg-black dark:text-zinc-50">
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-12 px-6 py-24">
         <header className="flex flex-col gap-5">
-          <p className="text-sm font-medium uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
-            Weekly Finance Brief
-          </p>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm font-medium uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+              Weekly Finance Brief
+            </p>
+            <nav className="flex items-center gap-5 text-sm font-medium text-zinc-600 dark:text-zinc-400">
+              <Link
+                href="/issues"
+                className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100"
+              >
+                Archive
+              </Link>
+              <Link
+                href="/login"
+                className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100"
+              >
+                Sign in
+              </Link>
+            </nav>
+          </div>
           <h1 className="text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
             The week in markets, in five minutes.
           </h1>

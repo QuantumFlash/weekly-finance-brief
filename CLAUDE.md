@@ -25,15 +25,15 @@ A low-touch subscription micro-SaaS: a concise weekly macro & markets brief for 
 | DB + Auth | Supabase (managed Postgres) | Magic-link auth preferred (less to build/secure) |
 | Billing | Stripe subscriptions (monthly, auto-renew) | Webhooks keep local state in sync; log all lifecycle events |
 | Email | Resend | Official client; dev sender `onboarding@resend.dev`, verified domain before launch |
-| AI | Anthropic API | See model routing below |
+| AI | Claude Code CLI (subscription, $0) | See model routing below |
 | Weekly job | `scripts/generateWeeklyBrief.ts` | Triggered weekly via scheduled routine (/schedule) |
 
-## Model routing (Claude API)
+## Model routing (Claude Code CLI — fully free)
 
-- **`MODELS.brief` = claude-fable-5, high effort** — the weekly summarisation batch job only. Long-context, structured inputs, stable cached system prompt (`prompts/fable-summariser.md`). Conservative max output tokens.
-- **`MODELS.interactive` = cheaper tier (e.g. Opus-class)** — small/interactive/low-stakes tasks: subject-line variants, admin summaries, glossary checks.
-- **Refusal/safety fallback:** detect refusal/truncation/empty output from the brief job → retry once on `MODELS.briefFallback` → fallback success still sends (per spec: the brief must go out), with the substitution logged → only a **double failure** marks the issue `needs_review`, alerts the admin, and holds the send.
-- All model IDs are env-overridable in `config/models.ts`. **Verified 2026-06-10 via `GET /v1/models`:** `claude-fable-5` and `claude-opus-4-8` (fallback/interactive) are live on this account. Still run `/claude-api` when building `lib/claude.ts` — it bakes in prompt-caching and refusal-handling best practice.
+- **Backend: `claude -p` on the owner's existing Claude subscription** (OAuth), per product decision 2026-06-10 ("build this fully free"). Zero marginal cost; same pattern as the jarvis service on this machine. Implementation: `lib/claude.ts` (stdin prompt, `--output-format json`, **ANTHROPIC_API_KEY stripped from child env** so the metered key can never hijack CLI auth).
+- **`MODELS.brief` = `opus`** (→ claude-opus-4-6 verified on this plan) — the weekly brief. **`MODELS.briefFallback` = `sonnet`**. `interactive` = sonnet (unused so far).
+- **Fallback policy:** primary fails/unusable → one retry on fallback → fallback success still sends (logged) → only a double failure marks `needs_review`, alerts admin, holds the send. First real run 2026-06-10: opus succeeded first try.
+- **Posture note:** subscription-backed generation is a personal-use arrangement — fine while the sole subscriber is the owner. **Before taking external paying customers, switch to the metered Anthropic API**: restore the SDK client from git history (commit `1527b1d`, fable-5-ready, /claude-api-built) and fund the API account. `ANTHROPIC_API_KEY` in `.env.local` is currently unused.
 
 ## Architecture (one paragraph)
 

@@ -21,7 +21,10 @@ export function parseBrief(raw: string): ParsedBrief {
     throw new Error("Brief is missing the required `Subject:` line");
   }
   const subject = match[1].trim();
-  const markdown = text.replace(/^Subject:\s*.+$/m, "").trim();
+  // Robustness across backends: drop anything before the Subject line
+  // (e.g. an assistant preamble), then remove the Subject line itself.
+  const fromSubject = text.slice(match.index ?? 0);
+  const markdown = fromSubject.replace(/^Subject:\s*.+$/m, "").trim();
   if (!/^## What happened this week/m.test(markdown)) {
     throw new Error("Brief is missing the `## What happened this week` section");
   }

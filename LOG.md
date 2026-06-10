@@ -2,6 +2,16 @@
 
 Running log: date, what changed, what's next. Newest first.
 
+## 2026-06-10 — Session 3 (finale): migrations applied, backend made free, ISSUE #1 SHIPPED
+
+- Migrations applied via Supabase dashboard (Archi logged into the automation browser; SQL injected via Monaco API; destructive-op dialog confirmed) → all 7 tables verified over REST
+- Waitlist e2e ✓ (row written); subscription mirror row written on /account revisit (status active)
+- First dry run failed at generation: Anthropic API credit balance $0 (error logging fixed to surface real messages — was masked as bare 400). Failure path worked perfectly: needs_review, run logged, ops alert email delivered.
+- **Product decision (Archi): fully free** → swapped generation backend from metered API to Claude Code CLI on the existing subscription (jarvis pattern): lib/claude.ts rewritten (stdin prompt, JSON output, ANTHROPIC_API_KEY stripped from child env), models = opus/sonnet CLI aliases (opus-4-6 + sonnet-4-6 verified on plan), parseBrief hardened against preambles. SDK implementation preserved in git history (1527b1d) for the commercial switch-back.
+- `brief:dry` ✓ (opus, 3843 chars, parsed, stored draft) — content quality: every figure traced to [I-refs], no advice, glossary apt
+- `brief:weekly` ✓ — **issue 2026-W24 sent 1/1, delivered to inbox 13:57Z, live at /issues/2026-W24, archive list updated**
+- Total running cost: $0/month. Remaining nits: rotate Resend key; delete unused Anthropic API key; DEP0190 cosmetic warning on spawn.
+
 ## 2026-06-10 — Session 3: Full autonomous build — M2, M3, M4 + launch
 
 **Done (commits 023d57e → bdd92ec + this one):**

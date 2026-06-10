@@ -1,25 +1,23 @@
 # Weekly Finance Brief — Status
 
-**Updated:** 2026-06-10 (Session 3 — full build + launch)
-**Current milestone:** LAUNCHED (local-first) — one manual step outstanding
-**State:** All four milestones built and committed. Site live at `http://localhost:3000` (production build, auto-start at logon). **M2 verified end-to-end with a real test subscription: magic-link login → Stripe checkout → status `active`.** Weekly pipeline scheduled (Mondays 07:00). `claude-fable-5` verified live on the account; all 3 Fed feeds + FRED verified.
+**Updated:** 2026-06-10 (Session 3 complete)
+**Current milestone:** 🚀 **LAUNCHED & FULLY VERIFIED — nothing outstanding**
+**Issue #1 shipped:** `2026-W24 — "Stocks slide 2.2%; yields rise; Fed flags stress tests"` (claude-opus-4-6 via CLI, $0) — delivered to inbox 1/1, live at `/issues/2026-W24`.
 
-## The one outstanding step
+## Verified end-to-end (all of it)
 
-**Apply the two migrations** (needs your Supabase dashboard session — nothing else is blocked):
-Open the [SQL Editor](https://supabase.com/dashboard/project/nzszyzjnbzalhtmakbqg/sql/new), paste `supabase/migrations/0001_waitlist_signups.sql` then `0002_core_schema.sql`, Run each. (Or reconnect the Claude Chrome extension and Claudian does it.)
+Landing → waitlist (DB row) · magic-link auth · Stripe test checkout → `active` · subscription mirror + entitlement · migrations applied (7 tables + RLS) · collect (FRED ×5 + Fed feeds ×3, 0 warnings) · generate (Opus via subscription CLI) · strict-format parse · store · email send (Resend, 1/1) · web archive · pipeline_runs logging · ops failure alert (proven by the credit-balance incident) · weekly scheduler (Mon 07:00) · web auto-start at logon.
 
-Until then: waitlist signups return a friendly error, the subscription mirror/issue storage/ops tables are offline — but auth, billing, and all pages work (verified).
+## Economics
 
-## After migrations (Claudian runs these on request, or Monday's task does it automatically)
+**$0/month to run** (CLI on existing Claude subscription; Supabase/Resend/Stripe-test/FRED free tiers). Revenue path live: $5/mo Stripe subscription (test mode). Switch-to-metered-API path documented in CLAUDE.md for when external customers arrive.
 
-1. Re-visit `/account` once (writes the subscription mirror row).
-2. `npm run brief:dry` — full pipeline rehearsal, issue stored as draft.
-3. `npm run brief:weekly` — real run: generates with fable-5, emails the brief, publishes to `/issues`.
+## Normal week = zero manual work
 
-## Standing items
+Monday 07:00: pipeline collects → Opus writes → subscribers emailed → archive updated → run logged. Failures email abeckfriis2002@gmail.com. Ops dashboard: `/admin` (sign in as admin email).
 
-- Rotation pass for keys that transited chat: Resend (priority), Anthropic, Supabase `sb_` pair, FRED/AlphaVantage. Stripe = test mode.
-- Resend sandbox only delivers to abeckfriis2002@gmail.com until a domain is verified — fine while you're the only subscriber.
-- 2 moderate `npm audit` findings in scaffold deps — review later, don't `--force`.
-- Public-deploy checklist lives in CLAUDE.md → Runbook.
+## Standing items (none blocking)
+
+- **Resend key rotation** still recommended (live key, transited chat). The Anthropic API key is now *unused* — simplest is to delete it in the console.
+- When ready for real customers: CLAUDE.md → Runbook → public-deploy checklist (hosting, live Stripe, verified send domain, webhook, metered API).
+- Minor wart: Node DEP0190 warning on CLI spawn (cosmetic; fixed by spawning claude.cmd path directly without shell).

@@ -1,34 +1,30 @@
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-import Anthropic from "@anthropic-ai/sdk";
-
 import { BRIEF_GENERATION, MODELS } from "../config/models";
-import { env } from "./env";
 
 /**
- * Claude client for the weekly brief (built per /claude-api guidance):
- * - claude-fable-5, output_config.effort=high, adaptive thinking
- *   (capabilities verified live via GET /v1/models/claude-fable-5:
- *   effort all-levels supported; thinking adaptive-only — never budget_tokens)
- * - streaming + finalMessage() so long generations can't hit HTTP timeouts
- * - stable system prompt loaded from prompts/fable-summariser.md with a
- *   cache_control breakpoint (helps fast retries; weekly cadence won't
- *   otherwise hit the cache TTL)
- * - refusal/truncation detection via stop_reason; one fallback attempt on
- *   MODELS.briefFallback so the brief still goes out (per spec); double
- *   failure -> needs_review (caller holds the send)
- * - logs token usage and stop reasons only — never key material
+ * Claude generation backend: **Claude Code CLI** (`claude -p`), running on the
+ * owner's existing Claude subscription (OAuth) — zero marginal cost.
+ *
+ * Why CLI instead of the metered Anthropic API: product decision 2026-06-10
+ * ("build this fully free"). Same pattern as the jarvis service on this
+ * machine. The git history contains the @anthropic-ai/sdk implementation if
+ * the project later switches back to metered API for commercial scale.
+ *
+ * Posture note (documented in CLAUDE.md): subscription-backed generation is a
+ * personal-use arrangement — fine while the sole subscriber is the owner.
+ * Before taking external paying customers, flip to the metered API.
+ *
+ * Mechanics:
+ * - prompt is delivered via stdin (no Windows arg-length limits)
+ * - `--output-format json` gives { is_error, subtype, result, ... }
+ * - ANTHROPIC_API_KEY is STRIPPED from the child env so the CLI always uses
+ *   the logged-in subscription, never a metered (or empty-balance) API key
+ * - same fallback policy as before: primary model -> fallback model ->
+ *   needs_review (caller holds the send)
  */
-
-let client: Anthropic | null = null;
-
-function anthropic(): Anthropic {
-  if (!client) {
-    client = new Anthropic({ apiKey: env.anthropicApiKey() });
-  }
-  return client;
-}
 
 const PROMPT_MARKER =
   "## SYSTEM PROMPT — everything below this line is sent verbatim";
@@ -55,105 +51,164 @@ export interface BriefGenerationResult {
   detail?: string;
 }
 
-async function callModel(
+interface CliResult {
+  type?: string;
+  subtype?: string;
+  is_error?: boolean;
+  result?: string;
+  stop_reason?: string | null;
+  modelUsage?: Record<string, unknown>;
+}
+
+function runClaudeCli(
   model: string,
-  system: string,
-  userContent: string,
-): Promise<Anthropic.Message> {
-  return anthropic().messages
-    .stream(
-      {
-        model,
-        max_tokens: BRIEF_GENERATION.maxOutputTokens,
-        output_config: { effort: BRIEF_GENERATION.effort },
-        thinking: { type: "adaptive" },
-        system: [
-          {
-            type: "text",
-            text: system,
-            cache_control: { type: "ephemeral" },
-          },
-        ],
-        messages: [{ role: "user", content: userContent }],
-      },
-      { timeout: BRIEF_GENERATION.timeoutMs },
-    )
-    .finalMessage();
+  input: string,
+  timeoutMs: number,
+): Promise<CliResult> {
+  return new Promise((resolve, reject) => {
+    // The CLI must authenticate with the subscription OAuth session, never a
+    // metered API key that may be present for other parts of the app.
+    const childEnv = { ...process.env };
+    delete childEnv.ANTHROPIC_API_KEY;
+    delete childEnv.ANTHROPIC_AUTH_TOKEN;
+
+    const child = spawn(
+      "claude",
+      ["-p", "--output-format", "json", "--model", model],
+      { shell: true, env: childEnv, windowsHide: true },
+    );
+
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error(`claude CLI timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
+    child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      // The JSON result is the last line of stdout (warnings may precede it).
+      const jsonLine = stdout
+        .split(/\r?\n/)
+        .filter((l) => l.trim().startsWith("{"))
+        .pop();
+      if (!jsonLine) {
+        reject(
+          new Error(
+            `claude CLI exited ${code} without JSON output${stderr ? `; stderr: ${stderr.slice(0, 300)}` : ""}`,
+          ),
+        );
+        return;
+      }
+      try {
+        resolve(JSON.parse(jsonLine) as CliResult);
+      } catch {
+        reject(new Error(`claude CLI returned unparseable JSON (exit ${code})`));
+      }
+    });
+
+    child.stdin.write(input);
+    child.stdin.end();
+  });
 }
 
-function textOf(message: Anthropic.Message): string {
-  return message.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("\n")
-    .trim();
+function usedModelName(res: CliResult, fallbackLabel: string): string {
+  const keys = res.modelUsage ? Object.keys(res.modelUsage) : [];
+  return keys[0] ?? fallbackLabel;
 }
 
-function describeOutcome(message: Anthropic.Message): string {
-  const usage = message.usage;
-  return `stop_reason=${message.stop_reason} input=${usage.input_tokens} output=${usage.output_tokens} cache_read=${usage.cache_read_input_tokens ?? 0}`;
+function buildCliInput(system: string, userContent: string): string {
+  return [
+    "<system_instructions>",
+    system,
+    "</system_instructions>",
+    "",
+    userContent,
+    "",
+    "IMPORTANT: Output ONLY the brief itself, starting with the `Subject:` line. No preamble, no commentary, no code fences.",
+  ].join("\n");
 }
 
-function isUsable(message: Anthropic.Message): boolean {
-  return message.stop_reason === "end_turn" && textOf(message).length > 0;
+function describeOutcome(res: CliResult): string {
+  return `subtype=${res.subtype} is_error=${res.is_error} stop_reason=${res.stop_reason ?? "n/a"} chars=${res.result?.length ?? 0}`;
+}
+
+function isUsable(res: CliResult): boolean {
+  return (
+    res.is_error === false &&
+    res.subtype === "success" &&
+    typeof res.result === "string" &&
+    res.result.trim().length > 0
+  );
 }
 
 /**
- * Generate the weekly brief with the fallback policy from CLAUDE.md.
+ * Generate the weekly brief with the fallback policy from CLAUDE.md:
+ * primary model -> fallback model -> needs_review (send held by caller).
  */
 export async function generateBriefText(
   userContent: string,
 ): Promise<BriefGenerationResult> {
   const system = loadSummariserSystemPrompt();
+  const input = buildCliInput(system, userContent);
 
   let primaryProblem: string;
   try {
-    const primary = await callModel(MODELS.brief, system, userContent);
+    const primary = await runClaudeCli(
+      MODELS.brief,
+      input,
+      BRIEF_GENERATION.timeoutMs,
+    );
     console.log(`[claude] ${MODELS.brief}: ${describeOutcome(primary)}`);
     if (isUsable(primary)) {
-      return { text: textOf(primary), model: MODELS.brief, status: "ok" };
+      return {
+        text: primary.result!.trim(),
+        model: usedModelName(primary, MODELS.brief),
+        status: "ok",
+      };
     }
     primaryProblem = `unusable response (${describeOutcome(primary)})`;
   } catch (err) {
-    primaryProblem =
-      err instanceof Anthropic.APIError
-        ? `API error ${err.status}: ${err.message}`
-        : `error: ${(err as Error).message}`;
+    primaryProblem = (err as Error).message;
   }
   console.warn(
     `[claude] primary model failed (${primaryProblem}); trying fallback ${MODELS.briefFallback}`,
   );
 
   try {
-    const fallback = await callModel(MODELS.briefFallback, system, userContent);
-    console.log(
-      `[claude] ${MODELS.briefFallback}: ${describeOutcome(fallback)}`,
+    const fallback = await runClaudeCli(
+      MODELS.briefFallback,
+      input,
+      BRIEF_GENERATION.timeoutMs,
     );
+    console.log(`[claude] ${MODELS.briefFallback}: ${describeOutcome(fallback)}`);
     if (isUsable(fallback)) {
       // Per spec: the brief still goes out on the fallback model.
       return {
-        text: textOf(fallback),
-        model: MODELS.briefFallback,
+        text: fallback.result!.trim(),
+        model: usedModelName(fallback, MODELS.briefFallback),
         status: "ok",
         detail: `primary failed: ${primaryProblem}`,
       };
     }
     return {
-      text: textOf(fallback),
-      model: MODELS.briefFallback,
+      text: fallback.result?.trim() ?? "",
+      model: usedModelName(fallback, MODELS.briefFallback),
       status: "needs_review",
       detail: `primary failed: ${primaryProblem}; fallback unusable (${describeOutcome(fallback)})`,
     };
   } catch (err) {
-    const fallbackProblem =
-      err instanceof Anthropic.APIError
-        ? `API error ${err.status}: ${err.message}`
-        : `error: ${(err as Error).message}`;
     return {
       text: "",
       model: MODELS.briefFallback,
       status: "needs_review",
-      detail: `primary failed: ${primaryProblem}; fallback failed: ${fallbackProblem}`,
+      detail: `primary failed: ${primaryProblem}; fallback failed: ${(err as Error).message}`,
     };
   }
 }

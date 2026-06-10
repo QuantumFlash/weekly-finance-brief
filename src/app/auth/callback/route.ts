@@ -12,7 +12,11 @@ export async function GET(request: Request): Promise<NextResponse> {
   const code = url.searchParams.get("code");
   const tokenHash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type") as EmailOtpType | null;
-  const next = url.searchParams.get("next") ?? "/account";
+  // Open-redirect guard: only same-site relative paths are honoured
+  // (`new URL(absoluteUrl, base)` would ignore the base entirely).
+  const rawNext = url.searchParams.get("next") ?? "/account";
+  const next =
+    rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/account";
 
   const supabase = await createSupabaseServerClient();
 

@@ -53,11 +53,8 @@ export const RSS_FEEDS: FeedConfig[] = [
     source: "US Federal Reserve (speeches & testimony)",
     kind: "headline",
   },
-  {
-    url: "https://www.bls.gov/feed/news_release.rss",
-    source: "US Bureau of Labor Statistics (news releases)",
-    kind: "official",
-  },
+  // BLS RSS removed 2026-06-10: endpoint 404s under known paths. BLS data
+  // (CPI, unemployment) still reaches the brief via the FRED indicators above.
 ];
 
 /** Items older than this many days are out of scope for the weekly brief. */

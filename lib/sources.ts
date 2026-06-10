@@ -138,7 +138,13 @@ export async function collectBriefInputs(now = new Date()): Promise<BriefInputs>
   }
 
   // --- Official summaries + headlines (allowlisted RSS) ---
-  const parser = new Parser({ timeout: 20000 });
+  const parser = new Parser({
+    timeout: 20000,
+    headers: {
+      // Polite, identifiable agent (some gov sites block generic agents).
+      "User-Agent": "WeeklyFinanceBrief/1.0 (contact: abeckfriis2002@gmail.com)",
+    },
+  });
   const officialSummaries: OfficialSummary[] = [];
   const commentaryHeadlines: CommentaryHeadline[] = [];
 

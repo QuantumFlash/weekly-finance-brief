@@ -1,55 +1,18 @@
 import { spawn } from "node:child_process";
-import fs from "node:fs";
-import path from "node:path";
 
-import { BRIEF_GENERATION, MODELS } from "../config/models";
+import type { ProviderResult } from "./gemini";
 
 /**
- * Claude generation backend: **Claude Code CLI** (`claude -p`), running on the
- * owner's existing Claude subscription (OAuth) — zero marginal cost.
+ * Claude Code CLI provider (`claude -p`) — runs on the owner's subscription
+ * OAuth. Since the Gemini free tier became the primary (2026-06-10, "don't
+ * want to waste my credits"), this provider is the EMERGENCY FALLBACK only:
+ * it is invoked solely when the primary fails, and can be disabled entirely
+ * with BRIEF_FALLBACK_CLI=off.
  *
- * Why CLI instead of the metered Anthropic API: product decision 2026-06-10
- * ("build this fully free"). Same pattern as the jarvis service on this
- * machine. The git history contains the @anthropic-ai/sdk implementation if
- * the project later switches back to metered API for commercial scale.
- *
- * Posture note (documented in CLAUDE.md): subscription-backed generation is a
- * personal-use arrangement — fine while the sole subscriber is the owner.
- * Before taking external paying customers, flip to the metered API.
- *
- * Mechanics:
- * - prompt is delivered via stdin (no Windows arg-length limits)
- * - `--output-format json` gives { is_error, subtype, result, ... }
- * - ANTHROPIC_API_KEY is STRIPPED from the child env so the CLI always uses
- *   the logged-in subscription, never a metered (or empty-balance) API key
- * - same fallback policy as before: primary model -> fallback model ->
- *   needs_review (caller holds the send)
+ * Mechanics: prompt via stdin (no arg-length limits), --output-format json,
+ * ANTHROPIC_API_KEY stripped from the child env so the CLI always uses the
+ * logged-in subscription, never a metered API key.
  */
-
-const PROMPT_MARKER =
-  "## SYSTEM PROMPT — everything below this line is sent verbatim";
-
-/** Loads the stable system prompt from prompts/fable-summariser.md. */
-export function loadSummariserSystemPrompt(): string {
-  const file = fs.readFileSync(
-    path.join(process.cwd(), "prompts", "fable-summariser.md"),
-    "utf8",
-  );
-  const idx = file.indexOf(PROMPT_MARKER);
-  if (idx === -1) {
-    throw new Error(
-      "prompts/fable-summariser.md: system prompt marker not found",
-    );
-  }
-  return file.slice(idx + PROMPT_MARKER.length).trim();
-}
-
-export interface BriefGenerationResult {
-  text: string;
-  model: string;
-  status: "ok" | "needs_review";
-  detail?: string;
-}
 
 interface CliResult {
   type?: string;
@@ -60,14 +23,12 @@ interface CliResult {
   modelUsage?: Record<string, unknown>;
 }
 
-function runClaudeCli(
-  model: string,
-  input: string,
-  timeoutMs: number,
-): Promise<CliResult> {
+export function cliFallbackEnabled(): boolean {
+  return (process.env.BRIEF_FALLBACK_CLI ?? "on").toLowerCase() !== "off";
+}
+
+function runCli(model: string, input: string, timeoutMs: number): Promise<CliResult> {
   return new Promise((resolve, reject) => {
-    // The CLI must authenticate with the subscription OAuth session, never a
-    // metered API key that may be present for other parts of the app.
     const childEnv = { ...process.env };
     delete childEnv.ANTHROPIC_API_KEY;
     delete childEnv.ANTHROPIC_AUTH_TOKEN;
@@ -93,7 +54,6 @@ function runClaudeCli(
     });
     child.on("close", (code) => {
       clearTimeout(timer);
-      // The JSON result is the last line of stdout (warnings may precede it).
       const jsonLine = stdout
         .split(/\r?\n/)
         .filter((l) => l.trim().startsWith("{"))
@@ -118,97 +78,31 @@ function runClaudeCli(
   });
 }
 
-function usedModelName(res: CliResult, fallbackLabel: string): string {
-  const keys = res.modelUsage ? Object.keys(res.modelUsage) : [];
-  return keys[0] ?? fallbackLabel;
-}
-
-function buildCliInput(system: string, userContent: string): string {
-  return [
+export async function runBriefViaCli(
+  system: string,
+  userContent: string,
+  model: string,
+  timeoutMs: number,
+): Promise<ProviderResult> {
+  const input = [
     "<system_instructions>",
     system,
     "</system_instructions>",
     "",
     userContent,
-    "",
-    "IMPORTANT: Output ONLY the brief itself, starting with the `Subject:` line. No preamble, no commentary, no code fences.",
   ].join("\n");
-}
-
-function describeOutcome(res: CliResult): string {
-  return `subtype=${res.subtype} is_error=${res.is_error} stop_reason=${res.stop_reason ?? "n/a"} chars=${res.result?.length ?? 0}`;
-}
-
-function isUsable(res: CliResult): boolean {
-  return (
-    res.is_error === false &&
-    res.subtype === "success" &&
-    typeof res.result === "string" &&
-    res.result.trim().length > 0
-  );
-}
-
-/**
- * Generate the weekly brief with the fallback policy from CLAUDE.md:
- * primary model -> fallback model -> needs_review (send held by caller).
- */
-export async function generateBriefText(
-  userContent: string,
-): Promise<BriefGenerationResult> {
-  const system = loadSummariserSystemPrompt();
-  const input = buildCliInput(system, userContent);
-
-  let primaryProblem: string;
-  try {
-    const primary = await runClaudeCli(
-      MODELS.brief,
-      input,
-      BRIEF_GENERATION.timeoutMs,
-    );
-    console.log(`[claude] ${MODELS.brief}: ${describeOutcome(primary)}`);
-    if (isUsable(primary)) {
-      return {
-        text: primary.result!.trim(),
-        model: usedModelName(primary, MODELS.brief),
-        status: "ok",
-      };
-    }
-    primaryProblem = `unusable response (${describeOutcome(primary)})`;
-  } catch (err) {
-    primaryProblem = (err as Error).message;
-  }
-  console.warn(
-    `[claude] primary model failed (${primaryProblem}); trying fallback ${MODELS.briefFallback}`,
-  );
 
   try {
-    const fallback = await runClaudeCli(
-      MODELS.briefFallback,
-      input,
-      BRIEF_GENERATION.timeoutMs,
-    );
-    console.log(`[claude] ${MODELS.briefFallback}: ${describeOutcome(fallback)}`);
-    if (isUsable(fallback)) {
-      // Per spec: the brief still goes out on the fallback model.
-      return {
-        text: fallback.result!.trim(),
-        model: usedModelName(fallback, MODELS.briefFallback),
-        status: "ok",
-        detail: `primary failed: ${primaryProblem}`,
-      };
-    }
-    return {
-      text: fallback.result?.trim() ?? "",
-      model: usedModelName(fallback, MODELS.briefFallback),
-      status: "needs_review",
-      detail: `primary failed: ${primaryProblem}; fallback unusable (${describeOutcome(fallback)})`,
-    };
+    const res = await runCli(model, input, timeoutMs);
+    const usedModel = res.modelUsage ? Object.keys(res.modelUsage)[0] : model;
+    const detail = `cli ${usedModel} subtype=${res.subtype} is_error=${res.is_error} chars=${res.result?.length ?? 0}`;
+    const ok =
+      res.is_error === false &&
+      res.subtype === "success" &&
+      typeof res.result === "string" &&
+      res.result.trim().length > 0;
+    return { ok, text: res.result?.trim() ?? "", detail };
   } catch (err) {
-    return {
-      text: "",
-      model: MODELS.briefFallback,
-      status: "needs_review",
-      detail: `primary failed: ${primaryProblem}; fallback failed: ${(err as Error).message}`,
-    };
+    return { ok: false, text: "", detail: `cli error: ${(err as Error).message}` };
   }
 }

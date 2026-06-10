@@ -12,7 +12,7 @@
  * failures alert the admin by email. Logs contain status/usage only — never
  * key material or recipient PII beyond what the job requires.
  */
-import { generateBriefText } from "../lib/claude";
+import { generateBriefText } from "../lib/generation";
 import { parseBrief, renderBrief } from "../lib/renderBrief";
 import { sendAdminAlert, sendIssueEmail } from "../lib/sendIssue";
 import {

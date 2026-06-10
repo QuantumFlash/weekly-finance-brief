@@ -28,12 +28,15 @@ A low-touch subscription micro-SaaS: a concise weekly macro & markets brief for 
 | AI | Claude Code CLI (subscription, $0) | See model routing below |
 | Weekly job | `scripts/generateWeeklyBrief.ts` | Triggered weekly via scheduled routine (/schedule) |
 
-## Model routing (Claude Code CLI — fully free)
+## Generation backend (free, off the owner's accounts)
 
-- **Backend: `claude -p` on the owner's existing Claude subscription** (OAuth), per product decision 2026-06-10 ("build this fully free"). Zero marginal cost; same pattern as the jarvis service on this machine. Implementation: `lib/claude.ts` (stdin prompt, `--output-format json`, **ANTHROPIC_API_KEY stripped from child env** so the metered key can never hijack CLI auth).
-- **`MODELS.brief` = `opus`** (→ claude-opus-4-6 verified on this plan) — the weekly brief. **`MODELS.briefFallback` = `sonnet`**. `interactive` = sonnet (unused so far).
-- **Fallback policy:** primary fails/unusable → one retry on fallback → fallback success still sends (logged) → only a double failure marks `needs_review`, alerts admin, holds the send. First real run 2026-06-10: opus succeeded first try.
-- **Posture note:** subscription-backed generation is a personal-use arrangement — fine while the sole subscriber is the owner. **Before taking external paying customers, switch to the metered Anthropic API**: restore the SDK client from git history (commit `1527b1d`, fable-5-ready, /claude-api-built) and fund the API account. `ANTHROPIC_API_KEY` in `.env.local` is currently unused.
+Provider chain in `lib/generation.ts` (pipeline only calls `generateBriefText()`):
+
+1. **Gemini free tier (PRIMARY)** — `lib/gemini.ts`, plain REST, `GEMINI_API_KEY` from Google AI Studio (no card, no Claude account, $0). Model env-overridable (`GEMINI_MODEL`, default gemini-2.5-flash — pin after probing available models with the real key).
+2. **Claude Code CLI (EMERGENCY FALLBACK ONLY)** — `lib/claude.ts`, owner's subscription OAuth; only runs if Gemini fails; disable entirely with `BRIEF_FALLBACK_CLI=off`. (Was the primary 2026-06-10 and shipped issue #1 — proven path.) ANTHROPIC_API_KEY is stripped from the child env.
+3. **needs_review** — draft stored, admin alerted, send held.
+
+History: metered Anthropic API client (fable-5, /claude-api-built) lives at commit `1527b1d` — restore + fund for commercial scale. The `ANTHROPIC_API_KEY` in `.env.local` is unused ($0 balance); simplest is deleting it in the console.
 
 ## Architecture (one paragraph)
 

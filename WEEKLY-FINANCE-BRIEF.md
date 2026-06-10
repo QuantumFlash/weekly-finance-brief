@@ -1,18 +1,25 @@
 # Weekly Finance Brief — Status
 
-**Updated:** 2026-06-10 (Session 2 — M1 build)
-**Current milestone:** M1 — Landing page + email capture
-**State:** M1 code complete and building cleanly (Next 16.2.9). Landing page with single CTA, `/api/waitlist` capture route (PostgREST + secret key, RLS locked), migration SQL written. Supabase keys are in. **Not yet live:** the table doesn't exist in Supabase until the migration runs.
+**Updated:** 2026-06-10 (Session 3 — full build + launch)
+**Current milestone:** LAUNCHED (local-first) — one manual step outstanding
+**State:** All four milestones built and committed. Site live at `http://localhost:3000` (production build, auto-start at logon). **M2 verified end-to-end with a real test subscription: magic-link login → Stripe checkout → status `active`.** Weekly pipeline scheduled (Mondays 07:00). `claude-fable-5` verified live on the account; all 3 Fed feeds + FRED verified.
 
-## Next 3 tasks
+## The one outstanding step
 
-1. **Archi:** open [Supabase SQL Editor](https://supabase.com/dashboard/project/nzszyzjnbzalhtmakbqg/sql/new), paste `supabase/migrations/0001_waitlist_signups.sql`, Run.
-2. `/run` the dev server, submit a test email, `/verify` the flow (row lands in `waitlist_signups`, duplicate submit still reports success).
-3. Kick off M2: Supabase magic-link auth + account page. (Needs `STRIPE_PUBLISHABLE_KEY` + webhook secret only when checkout work starts.)
+**Apply the two migrations** (needs your Supabase dashboard session — nothing else is blocked):
+Open the [SQL Editor](https://supabase.com/dashboard/project/nzszyzjnbzalhtmakbqg/sql/new), paste `supabase/migrations/0001_waitlist_signups.sql` then `0002_core_schema.sql`, Run each. (Or reconnect the Claude Chrome extension and Claudian does it.)
+
+Until then: waitlist signups return a friendly error, the subscription mirror/issue storage/ops tables are offline — but auth, billing, and all pages work (verified).
+
+## After migrations (Claudian runs these on request, or Monday's task does it automatically)
+
+1. Re-visit `/account` once (writes the subscription mirror row).
+2. `npm run brief:dry` — full pipeline rehearsal, issue stored as draft.
+3. `npm run brief:weekly` — real run: generates with fable-5, emails the brief, publishes to `/issues`.
 
 ## Standing items
 
-- All keys now in except `STRIPE_WEBHOOK_SECRET` (created during M2 webhook setup — nothing to fetch).
-- Anthropic key **validated** 2026-06-10; `claude-fable-5` + `claude-opus-4-8` confirmed live via `/v1/models`; routing config updated with verified IDs.
-- Rotation pass (keys transited chat): Resend (priority), Anthropic, Supabase `sb_` pair, FRED/AlphaVantage. Stripe = test mode, skip.
-- 2 moderate `npm audit` findings in scaffold deps — review at M4, don't `--force` fix.
+- Rotation pass for keys that transited chat: Resend (priority), Anthropic, Supabase `sb_` pair, FRED/AlphaVantage. Stripe = test mode.
+- Resend sandbox only delivers to abeckfriis2002@gmail.com until a domain is verified — fine while you're the only subscriber.
+- 2 moderate `npm audit` findings in scaffold deps — review later, don't `--force`.
+- Public-deploy checklist lives in CLAUDE.md → Runbook.

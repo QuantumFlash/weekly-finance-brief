@@ -51,12 +51,20 @@ Next.js app serves landing + auth + account + per-issue archive pages, plus API 
 
 ## Roadmap
 
-- [ ] **M1 — Landing page + email capture** ← current
-- [ ] **M2 — Auth + Stripe subscription + account page**
-- [ ] **M3 — Weekly pipeline** (sources → Fable 5 → email + web archive)
-- [ ] **M4 — Minimal admin/ops + monitoring** (job status, send log, failure alerts)
+- [x] **M1 — Landing page + email capture** (live; waitlist persistence activates when migrations run)
+- [x] **M2 — Auth + Stripe subscription + account page** (✅ verified end-to-end 2026-06-10: magic link → checkout → active)
+- [x] **M3 — Weekly pipeline** (code complete; sources + model verified live; full-run e2e pending migrations)
+- [x] **M4 — Minimal admin/ops + monitoring** (/admin live, failure alerts wired, weekly scheduler registered)
 
 Update checkboxes + `LOG.md` whenever a milestone lands.
+
+## Runbook (local-first launch)
+
+- **Web app:** `npm start` serves the production build on `http://localhost:3000`. Auto-starts at logon via `WeeklyFinanceBrief-Web.cmd` in the user Startup folder. Log: `logs/web.log`.
+- **Weekly pipeline:** Windows scheduled task `WeeklyFinanceBrief-Pipeline`, Mondays 07:00 (catches up if the machine was off/asleep). Manual: `npm run brief:weekly`; rehearsal without sending: `npm run brief:dry`. Log: `logs/brief.log`.
+- **Migrations:** SQL files in `supabase/migrations/`, applied via the Supabase Dashboard SQL Editor (no CLI/access token on this machine). Status 2026-06-10: **0001 + 0002 not yet applied** — the app degrades gracefully until then (Stripe stays source of truth; waitlist/issues/ops persistence offline).
+- **Email reality:** Resend sandbox sender (`onboarding@resend.dev`) delivers only to the account owner until a domain is verified in Resend → that's the next step when a second subscriber exists.
+- **Public deploy checklist (when ready):** host the app (e.g. Vercel), set `APP_BASE_URL`, register the Stripe webhook (+`STRIPE_WEBHOOK_SECRET`), switch Stripe to live keys, verify a Resend domain + change `EMAIL_FROM`, add the production URL to Supabase Auth redirect allowlist, move the weekly job to hosted cron (`/schedule` or platform cron with `CRON_SECRET`).
 
 ## Security & secrets
 

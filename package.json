@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "brief:weekly": "node --env-file=.env.local --import=tsx scripts/generateWeeklyBrief.ts",
+    "brief:dry": "node --env-file=.env.local --import=tsx scripts/generateWeeklyBrief.ts --dry"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",

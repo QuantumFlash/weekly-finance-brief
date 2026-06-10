@@ -24,8 +24,12 @@ export const MODELS = {
 export const BRIEF_GENERATION = {
   /** Batch job: depth over latency. */
   effort: "high",
-  /** Conservative cap — a brief is <= ~900 words plus structure. */
-  maxOutputTokens: 4000,
+  /**
+   * Bounded but not lowballed: adaptive-thinking tokens count toward output,
+   * and truncation (stop_reason=max_tokens) in an unattended weekly job is a
+   * worse failure mode than a few cents of headroom. Brief itself is ~1.5K tokens.
+   */
+  maxOutputTokens: 8000,
   /** One retry on fallback model, then mark needs_review and hold the send. */
   maxAttempts: 2,
   timeoutMs: 10 * 60_000,

@@ -2,6 +2,15 @@
 
 Running log: date, what changed, what's next. Newest first.
 
+## 2026-06-11 — Session 5 (coda): apex domain live, keys rotated, CI green
+
+- **weeklyfinancebrief.com is the site** — domains added to Vercel project via CLI; A/CNAME written via Cloudflare API (DNS-only); SSL auto-provisioned; verified via curl --resolve (local router still negative-caching, world resolves fine); Vercel aliases production to the apex.
+- APP_BASE_URL → apex in .env.local/Vercel/GitHub; Supabase redirect allowlist +apex callback (3 total); Stripe test webhook re-pointed at apex.
+- **Resend rotation:** created send-only `production-send-v2` via the full-access key, rolled into all three stores, test send ✓. Cleanup twist: deleting key "Weekly Financial Brief" killed my own bearer (it WAS the full-access key — self-cleanup achieved); the original chat-transited send key ("Onboarding") survives and needs Archi's dashboard click.
+- Apex verification sweep: 5 pages 200 + signup returns checkout URL; test signup cleaned up (user + Stripe customer).
+- CI sanity run with rotated key + new APP_BASE_URL: **success**.
+- Remaining: Stripe live keys (Archi: account activation → copy keys → I wire everything), two deletion clicks (old Resend key, CF DNS token).
+
 ## 2026-06-11 — Session 5 (finale): DOMAIN LIVE — the last blocker falls
 
 - Archi bought **weeklyfinancebrief.com** (Cloudflare) + provided scoped tokens (Resend full-access, Cloudflare DNS-edit).

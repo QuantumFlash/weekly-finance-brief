@@ -1,8 +1,8 @@
 # Weekly Finance Brief — Status
 
-**Updated:** 2026-06-11 (Session 5 — DEPLOYED)
-**Current milestone:** 🌍 LIVE IN PRODUCTION — fully hosted, runs without the local machine
-**Live site:** https://weekly-finance-brief.vercel.app
+**Updated:** 2026-06-11 (Session 5 — apex live, keys rotated)
+**Current milestone:** 🌍 LIVE IN PRODUCTION on the real domain
+**Live site:** https://weeklyfinancebrief.com (Vercel; `weekly-finance-brief.vercel.app` still aliases)
 
 ## What's live and verified
 

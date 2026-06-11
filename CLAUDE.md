@@ -85,11 +85,16 @@ Update checkboxes + `LOG.md` whenever a milestone lands.
 - DNS: Cloudflare zone `ab0958bc…` — DKIM TXT + SPF TXT/MX on `send` (managed by Resend's integration) + `_dmarc` TXT (p=none).
 - `EMAIL_FROM=brief@weeklyfinancebrief.com` in `.env.local`, Vercel, and the GitHub Actions secret. **Stranger-delivery verified**: sends to non-owner addresses land in INBOX.
 
-## Still needs Archi (business prerequisites, not code)
+## Custom domain live (2026-06-11) ✅
 
-1. **Stripe live keys** — currently test mode (`sk_test_`/`pk_test_`). For real charges: swap to live keys in Vercel, register a live-mode webhook, update `STRIPE_WEBHOOK_SECRET`.
-2. **Token hygiene** — delete the full-access Resend key ("Weekly Financial Brief Onboarding" at resend.com/api-keys — production uses the separate send-only key) and the Cloudflare DNS token (dash.cloudflare.com/profile/api-tokens); both transited chat. Plus the older rotation list (send-only Resend key, Gemini, Supabase `sb_` pair).
-3. **Optional:** point the apex `weeklyfinancebrief.com` at the app (Cloudflare DNS → CNAME to Vercel + add domain in Vercel project settings) so the site lives on the real domain instead of `*.vercel.app`.
+- **https://weeklyfinancebrief.com** is the primary production alias (`www` CNAME → Vercel too). DNS: A @ → 76.76.21.21, CNAME www → cname.vercel-dns.com, both DNS-only/unproxied in Cloudflare (avoid CF↔Vercel double-proxy).
+- `APP_BASE_URL=https://weeklyfinancebrief.com` in .env.local + Vercel + GitHub secret; Supabase redirect allowlist includes the apex callback (3 URLs total); Stripe webhook points at the apex. Full page sweep + signup-on-apex verified; CI run green post-rotation.
+- **Resend keys rotated 2026-06-11:** production runs on `production-send-v2` (send-only). The full-access setup key self-deleted during cleanup. ⚠ One orphan: the ORIGINAL chat-transited send key (named "Onboarding" in the dashboard) is still active and undeletable via API with remaining credentials — Archi must delete it at resend.com/api-keys.
+
+## Still needs Archi (the last items)
+
+1. **Stripe live keys** — test mode until then. Steps: Stripe Dashboard → complete account activation (business + payout details — Stripe requires this before live charges) → toggle Live mode → Developers → API keys → copy `sk_live_`/`pk_live_` → paste to Claudian, who wires Vercel env, creates the live-mode webhook via API, redeploys, and verifies (stopping short of a real-money checkout). Also rename the account's public name (still "Weekly Finance Brief sandbox") in Settings → Public details.
+2. **Two deletion clicks:** old Resend key "Onboarding" (resend.com/api-keys) + the Cloudflare DNS token (dash.cloudflare.com/profile/api-tokens — DNS-scoped tokens can't self-delete).
 
 ## Security & secrets
 

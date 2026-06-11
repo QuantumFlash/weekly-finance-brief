@@ -23,7 +23,13 @@ A low-touch subscription micro-SaaS: a concise weekly macro & markets brief for 
 |---|---|---|
 | Web app | Next.js (App Router, TS, Tailwind, `src/`) | Landing, auth, account, issue archive |
 | DB + Auth | Supabase (managed Postgres) | Magic-link auth preferred (less to build/secure) |
-| Billing | Stripe subscriptions (monthly, auto-renew) | **France account `acct_1Th4vuGlU4SM0UJi`, EUR, €5/mo** (replaced the un-fixable JP account `acct_1TgbuO…` — Stripe country is permanent; new account was the only path). Webhooks sync local state; Adaptive Pricing shows non-EUR visitors their local currency, merchant settles EUR. |
+| Billing | Stripe subscriptions, EUR €5/mo, **LIVE 2026-06-11** | Three FR accounts exist (see note). **Production = LIVE account `acct_1Th4vlGYylhw9dQu`** (activated, payouts on). Webhooks sync local state; Adaptive Pricing shows non-EUR visitors their currency, merchant settles EUR. |
+
+> **Stripe accounts (important — there are three):**
+> - `acct_1TgbuO…` — original JP/JPY account. Abandoned (country unchangeable). Close it.
+> - `acct_1Th4vuGlU4SM0UJi` — FR/EUR **TEST** account; local `.env.local` test keys point here. Either keep as the test/dev account or close it.
+> - `acct_1Th4vlGYylhw9dQu` — FR/EUR **LIVE** account, activated, payouts enabled. **This is the real one.** Vercel production holds its live keys + live webhook (`we_1Th5Bx…`). Live keys are ONLY in Vercel, never in `.env.local` or git.
+> Cleanup ideal: make the live account canonical — get ITS test keys for local dev (so test+live are one account), then close the JP + spare-FR-test accounts.
 | Email | Resend | Official client; dev sender `onboarding@resend.dev`, verified domain before launch |
 | AI | Claude Code CLI (subscription, $0) | See model routing below |
 | Weekly job | `scripts/generateWeeklyBrief.ts` | Triggered weekly via scheduled routine (/schedule) |

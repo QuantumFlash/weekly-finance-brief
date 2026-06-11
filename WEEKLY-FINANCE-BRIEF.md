@@ -17,9 +17,15 @@
 
 Verified in Resend, `EMAIL_FROM=brief@weeklyfinancebrief.com` everywhere, **stranger-delivery proven** (non-owner inbox ✓). The product can email anyone. Growth blocker eliminated.
 
-## The 1 thing that still needs YOU (business, not code)
+## 💸 LIVE — taking real money (2026-06-11)
 
-**Switch Stripe to live keys** when ready for real money (currently test mode — checkout works but charges aren't real). Swap keys in Vercel, register a live webhook. Until then: fully functional product, fake money.
+Production runs on the activated France/EUR live account `acct_1Th4vlGYylhw9dQu`. Live checkout verified (`cs_live_`, €5/mo), live webhook registered, live keys in Vercel only. A real visitor who completes checkout is now a paying customer.
+
+## Cleanup when convenient (housekeeping, not blocking)
+
+- You have **3 Stripe accounts**: JP (original, abandoned), FR-test (`…vuGlU4SM0UJi`), FR-live (`…vlGYylhw9dQu`, the real one). Tidy: send me the FR-LIVE account's *test* keys so local dev matches production on one account, then close the JP + spare FR-test accounts.
+- Optional clean Resend re-rotation (send-only key in transcript) — needs one `gh` 2FA.
+- In Stripe → Settings → Business, set the public-facing name (still shows "…sandbox").
 
 Token cleanup when convenient: delete the full-access Resend key + Cloudflare DNS token (both transited chat, both done with their jobs). Optional polish: point the apex domain at Vercel so the site lives on weeklyfinancebrief.com.
 

@@ -2,6 +2,18 @@
 
 Running log: date, what changed, what's next. Newest first.
 
+## 2026-06-11 — Session 7: diagnostic + polished email + fully live (autonomous)
+
+**Full diagnostic — all green:** site 7 pages (auth redirects + secret-gating correct), DNS all records, live Stripe (FR/EUR, charges+payouts, webhook 5 events, €5 price), Supabase 8 tables, email deliverability from verified domain, Gemini (primary 3.5-flash 503s/busy → fallback 2.5-flash works), GitHub Actions **scheduled cron run #4 succeeded on its own** (hosted automation proven), 19/19 Vercel env vars present.
+
+**Fixed during diagnostic:** deleted a stale "active" subscription mirror (owner row pointing at the dead JP customer `cus_Ug8…`) that would have **broken the owner's /account page** on the live site (sync would call a non-existent customer). Subscriptions now 0 — clean live state.
+
+**Polished email template** (`renderBrief` rewrite): table-based / email-client-safe, dark branded header with emerald accent + week label, meta line (date · 5 min read), emerald-underlined section headings, bold figures, muted `[S1]` source refs, footer with read-on-web + per-recipient unsubscribe + disclaimer, hidden preheader. Web archive (`briefBodyHtml`) gets muted refs too. `sendIssue` unsubscribe regex made attribute-tolerant. Verified by rendering real W24 and sending to owner + screenshotting (docs-assets-email.png) — looks professional.
+
+**Set live & active:** disabled redundant local Windows pipeline task + removed the Startup web launcher (hosted GitHub Actions cron is the single canonical runner; site is on Vercel). Pushed, redeployed, re-ran the hosted pipeline on the new commit → success.
+
+**Remaining (all optional, all Archi):** Stripe public name (still "…sandbox"); consolidate the 3 Stripe accounts (send FR-live test keys → close spares); optional Resend re-rotation.
+
 ## 2026-06-11 — Session 6: Stripe account moved JP → France (payout fix)
 
 - Problem: Stripe account `acct_1TgbuO…` was country JP / JPY — can't pay out to Archi's French Revolut, and Stripe country is permanent (unchangeable). Caught via `GET /v1/account` before any live keys went in.

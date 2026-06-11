@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #09090b;
+  --foreground: #fafafa;
 }
 
 @theme inline {
@@ -12,15 +12,23 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), -apple-system, "Segoe UI", sans-serif;
+}
+
+::selection {
+  background-color: rgba(52, 211, 153, 0.25);
+}
+
+/* Soft radial glow used behind the hero and signup sections. */
+.glow {
+  background:
+    radial-gradient(600px circle at 20% 10%, rgba(16, 185, 129, 0.13), transparent 55%),
+    radial-gradient(700px circle at 85% 35%, rgba(16, 185, 129, 0.07), transparent 60%);
 }

@@ -42,15 +42,22 @@ History: metered Anthropic API client (fable-5, /claude-api-built) lives at comm
 
 Next.js app serves landing + auth + account + per-issue archive pages, plus API routes for email capture and the Stripe webhook. A single worker script (`scripts/generateWeeklyBrief.ts`) runs weekly: collect approved sources (FRED, official summaries, feeds) → normalise to structured JSON → Fable 5 generates the brief (strict markdown contract) → store as an `issues` row → render HTML+text email → send via Resend to active subscribers → record `deliveries`. Web archive reads `issues` directly. That's the whole system.
 
-## Data model (planned)
+## Data model
 
-- `profiles` — app user data keyed to Supabase auth users
+- `profiles` — delivery_day (0=Sun..6=Sat, JS getDay), trial_ends_at (7-day free trial, never reset on re-signup), welcomed_at
 - `subscriptions` — Stripe customer/subscription ids, status, period end
 - `subscription_events` — append-only log of every Stripe lifecycle event
-- `waitlist_signups` — pre-launch email capture (M1)
-- `issues` — each weekly brief: structured content, status (draft/needs_review/sent), week label
-- `deliveries` — who got which issue, when, send result
-- `source_snapshots` — optional small metadata about inputs used per issue (titles/urls/dates only)
+- `waitlist_signups` — legacy pre-launch capture (UI now drives trial signups)
+- `issues` — ONE per ISO week: status draft/needs_review/sent (sent = published to archive; per-user timing lives in deliveries). Published issues are immutable to the pipeline.
+- `deliveries` — who got which issue, when, send result (unique issue+email = idempotent re-runs)
+- `source_snapshots` — small metadata about inputs used per issue (titles/urls/dates only)
+
+## Product flow (M5: trial + per-day delivery)
+
+- **Signup** (home page): email + delivery-day picker → `/api/signup` → find-or-create auth user → profile with 7-day trial (no card) → branded welcome email immediately (Resend). Sign-in stays magic-link via Supabase's own sender.
+- **Entitled** = Stripe active/trialing/past_due OR active trial. Day changeable from /account.
+- **Pipeline runs DAILY 07:00**: generates the week's issue on the first run of the ISO week (publishes to archive), then each day delivers to entitled users whose delivery_day == today. Fully idempotent.
+- **Email deliverability lessons (2026-06-11, bisected live):** (1) never embed Supabase auth-verify links in app emails — silently dropped as phishing; (2) avoid phish-pattern SUBJECTS ("sign-in link", "free week starts now") on the sandbox sender — use informational subjects ("Weekly Finance Brief: first issue lands Friday"). Plain/neutral content delivers in seconds.
 
 ## Roadmap
 
@@ -58,6 +65,7 @@ Next.js app serves landing + auth + account + per-issue archive pages, plus API 
 - [x] **M2 — Auth + Stripe subscription + account page** (✅ verified end-to-end 2026-06-10: magic link → checkout → active)
 - [x] **M3 — Weekly pipeline** (code complete; sources + model verified live; full-run e2e pending migrations)
 - [x] **M4 — Minimal admin/ops + monitoring** (/admin live, failure alerts wired, weekly scheduler registered)
+- [x] **M5 — Modern UI + free trial + per-day delivery** (2026-06-11: dark/emerald redesign, about-us, day-picker signup, 7-day card-less trial, welcome email, daily pipeline)
 
 Update checkboxes + `LOG.md` whenever a milestone lands.
 

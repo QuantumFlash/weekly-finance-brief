@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 
 import { briefBodyHtml } from "../../../../lib/renderBrief";
 import { createSupabaseServerClient } from "../../../../lib/supabase/server";
+import { SiteFooter } from "@/components/SiteFooter";
+import { SiteHeader } from "@/components/SiteHeader";
 
 export const revalidate = 300;
 
@@ -44,16 +46,17 @@ export default async function IssuePage({
   }
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans text-zinc-900 dark:bg-black dark:text-zinc-50">
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-24">
-        <header className="flex flex-col gap-3">
+    <div className="flex min-h-full flex-1 flex-col bg-zinc-950 font-sans text-zinc-50">
+      <SiteHeader />
+      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-16">
+        <header className="mb-8 flex flex-col gap-3">
           <Link
             href="/issues"
-            className="text-sm font-medium uppercase tracking-widest text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+            className="text-sm font-medium text-zinc-400 transition-colors hover:text-emerald-300"
           >
             ← Archive
           </Link>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-zinc-500">
             {issue.week_label}
             {issue.sent_at &&
               ` · ${new Date(issue.sent_at).toLocaleDateString("en-GB", {
@@ -62,24 +65,30 @@ export default async function IssuePage({
                 year: "numeric",
               })}`}
           </p>
-          <h1 className="text-3xl font-semibold leading-tight tracking-tight">
+          <h1 className="text-balance text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
             {issue.subject}
           </h1>
         </header>
 
         <article
-          className="rounded-xl border border-zinc-200 bg-white p-8 dark:border-zinc-800 dark:bg-zinc-950 [&_h2]:!text-zinc-900 [&_li]:!text-zinc-700 [&_p]:!text-zinc-700 dark:[&_h2]:!text-zinc-100 dark:[&_li]:!text-zinc-300 dark:[&_p]:!text-zinc-300"
+          className="rounded-3xl border border-white/10 bg-white p-8 text-zinc-900 shadow-2xl shadow-black/40 sm:p-10"
           // Safe: briefBodyHtml escapes all source text before adding markup.
           dangerouslySetInnerHTML={{ __html: briefBodyHtml(issue.body_markdown) }}
         />
 
-        <footer className="text-sm text-zinc-500 dark:text-zinc-400">
-          Educational information only — not investment advice. ·{" "}
-          <Link href="/" className="underline underline-offset-4">
-            Get this in your inbox weekly
+        <footer className="mt-8 flex flex-col items-start gap-4">
+          <p className="text-sm text-zinc-500">
+            Educational information only — not investment advice.
+          </p>
+          <Link
+            href="/#signup"
+            className="rounded-xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-emerald-950 transition-all hover:bg-emerald-300"
+          >
+            Get this in your inbox — free for a week
           </Link>
         </footer>
       </main>
+      <SiteFooter />
     </div>
   );
 }

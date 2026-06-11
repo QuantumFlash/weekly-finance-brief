@@ -3,22 +3,22 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { isEntitled, syncSubscriptionForUser } from "../../../lib/billing";
+import { DAY_NAMES, trialActive, trialDaysLeft, type Profile } from "../../../lib/profile";
 import { createSupabaseServerClient } from "../../../lib/supabase/server";
+import { SiteFooter } from "@/components/SiteFooter";
+import { SiteHeader } from "@/components/SiteHeader";
 
 export const metadata: Metadata = {
   title: "Account — Weekly Finance Brief",
 };
 
-function StatusBadge({ status }: { status: string }) {
-  const entitled = isEntitled(status);
-  const label =
-    status === "none" ? "No subscription" : status.replace(/_/g, " ");
+function StatusBadge({ label, good }: { label: string; good: boolean }) {
   return (
     <span
       className={
-        entitled
-          ? "rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"
-          : "rounded-full bg-zinc-200 px-3 py-1 text-sm font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+        good
+          ? "rounded-full bg-emerald-400/15 px-3 py-1 text-sm font-medium text-emerald-300"
+          : "rounded-full bg-white/10 px-3 py-1 text-sm font-medium text-zinc-300"
       }
     >
       {label}
@@ -40,9 +40,19 @@ export default async function AccountPage({
     redirect("/login");
   }
 
-  // Stripe is the source of truth — sync on every account view.
   const subscription = await syncSubscriptionForUser(user.id, user.email);
-  const entitled = isEntitled(subscription.status);
+  const subEntitled = isEntitled(subscription.status);
+
+  const { data: profileRow } = await supabase
+    .from("profiles")
+    .select("user_id, delivery_day, trial_ends_at, welcomed_at")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const profile = (profileRow as Profile | null) ?? null;
+  const onTrial = trialActive(profile);
+  const daysLeft = trialDaysLeft(profile);
+  const deliveryDay = profile?.delivery_day ?? 1;
+  const entitled = subEntitled || onTrial;
 
   const { data: issues } = await supabase
     .from("issues")
@@ -51,23 +61,19 @@ export default async function AccountPage({
     .order("sent_at", { ascending: false })
     .limit(5);
 
+  const card =
+    "rounded-3xl border border-white/10 bg-zinc-900/60 p-7 backdrop-blur";
+
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans text-zinc-900 dark:bg-black dark:text-zinc-50">
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 px-6 py-24">
-        <header className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-2">
-            <Link
-              href="/"
-              className="text-sm font-medium uppercase tracking-widest text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-            >
-              Weekly Finance Brief
-            </Link>
-            <h1 className="text-3xl font-semibold tracking-tight">Account</h1>
-          </div>
+    <div className="flex min-h-full flex-1 flex-col bg-zinc-950 font-sans text-zinc-50">
+      <SiteHeader />
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-7 px-6 py-16">
+        <header className="flex items-center justify-between gap-4">
+          <h1 className="text-3xl font-semibold tracking-tight">Account</h1>
           <form action="/api/auth/signout" method="POST">
             <button
               type="submit"
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              className="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:border-white/25 hover:text-zinc-50"
             >
               Sign out
             </button>
@@ -75,102 +81,183 @@ export default async function AccountPage({
         </header>
 
         {params.checkout === "success" && (
-          <p
-            role="status"
-            className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-base text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
-          >
-            Subscription confirmed — welcome aboard. Your first brief arrives
-            with the next weekly send.
+          <p role="status" className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-4 text-[15px] text-emerald-200">
+            Subscription confirmed — welcome aboard. Your next brief arrives on{" "}
+            {DAY_NAMES[deliveryDay]}.
           </p>
         )}
         {params.checkout === "cancelled" && (
-          <p className="rounded-lg border border-zinc-300 bg-white px-4 py-3 text-base text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+          <p className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-[15px] text-zinc-300">
             Checkout cancelled — no charge was made.
           </p>
         )}
         {(params.checkout === "error" || params.portal === "error") && (
-          <p
-            role="alert"
-            className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-base text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
-          >
+          <p role="alert" className="rounded-2xl border border-red-400/30 bg-red-400/10 px-5 py-4 text-[15px] text-red-300">
             Something went wrong with billing — please try again.
           </p>
         )}
+        {params.day === "saved" && (
+          <p role="status" className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-4 text-[15px] text-emerald-200">
+            Delivery day updated.
+          </p>
+        )}
+        {(params.day === "error" || params.day === "invalid") && (
+          <p role="alert" className="rounded-2xl border border-red-400/30 bg-red-400/10 px-5 py-4 text-[15px] text-red-300">
+            Couldn’t update your delivery day — please try again.
+          </p>
+        )}
 
-        <section className="flex flex-col gap-4 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
-          <h2 className="text-lg font-semibold">Subscription</h2>
-          <dl className="flex flex-col gap-3 text-base">
+        {/* Trial state */}
+        {onTrial && !subEntitled && (
+          <div className="flex flex-col gap-3 rounded-3xl border border-emerald-400/25 bg-emerald-400/[0.07] p-7">
             <div className="flex items-center justify-between gap-4">
-              <dt className="text-zinc-500 dark:text-zinc-400">Email</dt>
-              <dd>{user.email}</dd>
+              <h2 className="text-lg font-semibold text-emerald-200">
+                Free trial active
+              </h2>
+              <StatusBadge
+                good
+                label={daysLeft === 1 ? "1 day left" : `${daysLeft} days left`}
+              />
+            </div>
+            <p className="text-[15px] leading-7 text-zinc-300">
+              You’re getting the full Weekly Finance Brief. Subscribe before
+              your trial ends to keep it coming — $5/month, cancel anytime.
+            </p>
+            <form action="/api/billing/checkout" method="POST">
+              <button
+                type="submit"
+                className="h-11 rounded-xl bg-emerald-400 px-6 text-sm font-semibold text-emerald-950 transition-all hover:bg-emerald-300"
+              >
+                Subscribe — $5/month
+              </button>
+            </form>
+          </div>
+        )}
+        {!entitled && (
+          <div className="flex flex-col gap-3 rounded-3xl border border-amber-400/25 bg-amber-400/[0.06] p-7">
+            <h2 className="text-lg font-semibold text-amber-200">
+              Your free trial has ended
+            </h2>
+            <p className="text-[15px] leading-7 text-zinc-300">
+              Subscribe to keep receiving your weekly brief on{" "}
+              {DAY_NAMES[deliveryDay]}s.
+            </p>
+            <form action="/api/billing/checkout" method="POST">
+              <button
+                type="submit"
+                className="h-11 rounded-xl bg-emerald-400 px-6 text-sm font-semibold text-emerald-950 transition-all hover:bg-emerald-300"
+              >
+                Subscribe — $5/month
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Delivery day */}
+        <section className={card}>
+          <h2 className="mb-1 text-lg font-semibold">Delivery day</h2>
+          <p className="mb-5 text-sm text-zinc-400">
+            Your brief arrives every{" "}
+            <span className="text-zinc-200">{DAY_NAMES[deliveryDay]}</span> at 7am.
+          </p>
+          <form action="/api/profile/day" method="POST" className="flex flex-wrap items-center gap-3">
+            <label htmlFor="day-select" className="sr-only">
+              Delivery day
+            </label>
+            <select
+              id="day-select"
+              name="day"
+              defaultValue={deliveryDay}
+              className="h-11 flex-1 rounded-xl border border-white/10 bg-zinc-900 px-3 text-[15px] text-zinc-100 outline-none focus:border-emerald-400/60 sm:max-w-56"
+            >
+              {[1, 2, 3, 4, 5, 6, 0].map((d) => (
+                <option key={d} value={d}>
+                  {DAY_NAMES[d]}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="h-11 rounded-xl border border-white/10 px-5 text-sm font-medium text-zinc-200 transition-colors hover:border-emerald-400/40 hover:text-emerald-200"
+            >
+              Save
+            </button>
+          </form>
+        </section>
+
+        {/* Subscription */}
+        <section className={card}>
+          <h2 className="mb-5 text-lg font-semibold">Subscription</h2>
+          <dl className="flex flex-col gap-3.5 text-[15px]">
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-zinc-400">Email</dt>
+              <dd className="text-zinc-100">{user.email}</dd>
             </div>
             <div className="flex items-center justify-between gap-4">
-              <dt className="text-zinc-500 dark:text-zinc-400">Status</dt>
+              <dt className="text-zinc-400">Status</dt>
               <dd>
-                <StatusBadge status={subscription.status} />
+                <StatusBadge
+                  good={entitled}
+                  label={
+                    subEntitled
+                      ? subscription.status.replace(/_/g, " ")
+                      : onTrial
+                        ? "free trial"
+                        : "no subscription"
+                  }
+                />
               </dd>
             </div>
             {subscription.current_period_end && (
               <div className="flex items-center justify-between gap-4">
-                <dt className="text-zinc-500 dark:text-zinc-400">
-                  Current period ends
-                </dt>
-                <dd>
-                  {new Date(
-                    subscription.current_period_end,
-                  ).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
+                <dt className="text-zinc-400">Current period ends</dt>
+                <dd className="text-zinc-100">
+                  {new Date(subscription.current_period_end).toLocaleDateString(
+                    "en-GB",
+                    { day: "numeric", month: "long", year: "numeric" },
+                  )}
                 </dd>
               </div>
             )}
           </dl>
-          {entitled ? (
-            <form action="/api/billing/portal" method="POST">
+          {subEntitled && (
+            <form action="/api/billing/portal" method="POST" className="mt-5">
               <button
                 type="submit"
-                className="h-11 rounded-lg border border-zinc-300 px-5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                className="h-11 rounded-xl border border-white/10 px-5 text-sm font-medium text-zinc-200 transition-colors hover:border-white/25"
               >
                 Manage billing
-              </button>
-            </form>
-          ) : (
-            <form action="/api/billing/checkout" method="POST">
-              <button
-                type="submit"
-                className="h-11 rounded-lg bg-zinc-900 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
-              >
-                Subscribe — $5/month
               </button>
             </form>
           )}
         </section>
 
-        <section className="flex flex-col gap-4">
-          <h2 className="text-lg font-semibold">Recent issues</h2>
+        {/* Recent issues */}
+        <section className={card}>
+          <h2 className="mb-5 text-lg font-semibold">Recent issues</h2>
           {issues && issues.length > 0 ? (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-2.5">
               {issues.map((issue) => (
                 <li key={issue.week_label}>
                   <Link
                     href={`/issues/${issue.week_label}`}
-                    className="text-base text-zinc-700 underline-offset-4 hover:underline dark:text-zinc-300"
+                    className="text-[15px] text-zinc-300 underline-offset-4 transition-colors hover:text-emerald-300 hover:underline"
                   >
-                    {issue.week_label}: {issue.subject}
+                    <span className="text-zinc-500">{issue.week_label}</span>{" "}
+                    {issue.subject}
                   </Link>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-base text-zinc-500 dark:text-zinc-400">
-              No issues sent yet — the first one lands with the next weekly
-              run.
+            <p className="text-[15px] text-zinc-400">
+              No issues published yet — your first one lands on{" "}
+              {DAY_NAMES[deliveryDay]}.
             </p>
           )}
         </section>
       </main>
+      <SiteFooter />
     </div>
   );
 }

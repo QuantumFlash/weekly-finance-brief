@@ -2,6 +2,7 @@ import { Resend } from "resend";
 
 import { isEntitled } from "./billing";
 import { env } from "./env";
+import { trialActive, type Profile } from "./profile";
 import { supabaseAdmin } from "./supabase/admin";
 
 let resendClient: Resend | null = null;
@@ -17,52 +18,102 @@ export interface SendReport {
   attempted: number;
   sent: number;
   failed: number;
+  skippedAlreadyDelivered: number;
 }
 
-/** Entitled recipients = subscription rows whose status grants the brief. */
-export async function listEntitledRecipients(): Promise<
-  Array<{ email: string; userId: string }>
-> {
+/**
+ * Entitled = active/trialing/past_due Stripe subscription OR active free
+ * trial on the profile. When `forDay` is given (0=Sun..6=Sat), only users
+ * whose chosen delivery day matches are returned (no profile -> Monday).
+ */
+export async function listEntitledRecipients(
+  forDay?: number,
+): Promise<Array<{ email: string; userId: string }>> {
   const db = supabaseAdmin();
-  const { data: rows, error } = await db
-    .from("subscriptions")
-    .select("user_id, status");
-  if (error) {
-    throw new Error(`failed to list subscriptions: ${error.message}`);
+  const [{ data: subRows, error: subError }, { data: profRows, error: profError }] =
+    await Promise.all([
+      db.from("subscriptions").select("user_id, status"),
+      db.from("profiles").select("user_id, delivery_day, trial_ends_at, welcomed_at"),
+    ]);
+  if (subError) {
+    throw new Error(`failed to list subscriptions: ${subError.message}`);
+  }
+  if (profError) {
+    throw new Error(`failed to list profiles: ${profError.message}`);
   }
 
+  const profByUser = new Map<string, Profile>(
+    (profRows ?? []).map((p) => [p.user_id as string, p as Profile]),
+  );
+  const statusByUser = new Map<string, string>(
+    (subRows ?? []).map((s) => [s.user_id as string, s.status as string]),
+  );
+  const userIds = new Set<string>([...profByUser.keys(), ...statusByUser.keys()]);
+
   const recipients: Array<{ email: string; userId: string }> = [];
-  for (const row of rows ?? []) {
-    if (!isEntitled(row.status as string)) {
+  for (const userId of userIds) {
+    const profile = profByUser.get(userId) ?? null;
+    const entitled =
+      isEntitled(statusByUser.get(userId) ?? "none") || trialActive(profile);
+    if (!entitled) {
       continue;
     }
-    const { data } = await db.auth.admin.getUserById(row.user_id as string);
+    const day = profile?.delivery_day ?? 1;
+    if (forDay !== undefined && day !== forDay) {
+      continue;
+    }
+    const { data } = await db.auth.admin.getUserById(userId);
     const email = data.user?.email;
     if (email) {
-      recipients.push({ email, userId: row.user_id as string });
+      recipients.push({ email, userId });
     }
   }
   return recipients;
 }
 
 /**
- * Send one issue to all entitled subscribers, recording a delivery row per
- * recipient. Failures are per-recipient, never abort the batch.
- * NOTE: until a sending domain is verified in Resend, the sandbox sender can
- * only deliver to the account owner's address — other recipients will record
- * as failed (which is the honest state of the world).
+ * Send one issue to recipients (optionally only those whose delivery day is
+ * `forDay`), skipping anyone who already received it — fully idempotent, so
+ * the daily pipeline can re-run safely. Failures are per-recipient.
+ * Resend sandbox: only the owner's address is deliverable until a domain is
+ * verified; others record as failed (honest state).
  */
 export async function sendIssueEmail(params: {
   issueId: string;
   subject: string;
   html: string;
   text: string;
+  forDay?: number;
 }): Promise<SendReport> {
-  const recipients = await listEntitledRecipients();
   const db = supabaseAdmin();
-  const report: SendReport = { attempted: recipients.length, sent: 0, failed: 0 };
+
+  const { data: delivered, error: deliveredError } = await db
+    .from("deliveries")
+    .select("email")
+    .eq("issue_id", params.issueId)
+    .eq("status", "sent");
+  if (deliveredError) {
+    throw new Error(`failed to read deliveries: ${deliveredError.message}`);
+  }
+  const alreadyDelivered = new Set(
+    (delivered ?? []).map((d) => (d.email as string).toLowerCase()),
+  );
+
+  const recipients = await listEntitledRecipients(params.forDay);
+  const report: SendReport = {
+    attempted: 0,
+    sent: 0,
+    failed: 0,
+    skippedAlreadyDelivered: 0,
+  };
 
   for (const recipient of recipients) {
+    if (alreadyDelivered.has(recipient.email.toLowerCase())) {
+      report.skippedAlreadyDelivered += 1;
+      continue;
+    }
+    report.attempted += 1;
+
     let status = "sent";
     let providerId: string | null = null;
     let errorText: string | null = null;
@@ -83,7 +134,7 @@ export async function sendIssueEmail(params: {
       status = "failed";
       errorText = (err as Error).message;
       report.failed += 1;
-      console.error(`[send] delivery failed (status only logged)`);
+      console.error("[send] delivery failed (status only logged)");
     }
 
     const { error: insertError } = await db.from("deliveries").upsert(

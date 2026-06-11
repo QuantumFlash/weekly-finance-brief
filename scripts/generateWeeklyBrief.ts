@@ -1,16 +1,21 @@
 /**
- * generateWeeklyBrief — the weekly pipeline (M3).
+ * generateWeeklyBrief — the daily pipeline (M3 + per-day delivery).
  *
- * Run:
- *   npm run brief:weekly        — full run: collect -> generate -> store -> send
- *   npm run brief:dry           — everything except sending (issue stored as draft)
+ * Runs DAILY at 07:00 (Task Scheduler). Semantics:
+ *   - ONE issue per ISO week. Generated (Gemini ladder -> CLI fallback) on the
+ *     first daily run of that week, published to the archive immediately
+ *     (status 'sent' = published; per-user timing lives in `deliveries`).
+ *   - Each run then delivers the week's issue to entitled users whose chosen
+ *     delivery_day matches today (0=Sun..6=Sat). Entitled = Stripe
+ *     active/trialing/past_due OR an active free trial. Idempotent: users who
+ *     already received this issue are skipped, so re-runs are safe.
+ *   - Published issues are immutable: later daily runs reuse the stored
+ *     content and never regenerate or rewrite it.
  *
- * Flow: collect allowlisted sources -> build prompt input -> claude-fable-5
- * (high effort, fallback claude-opus-4-8) -> parse strict markdown -> store
- * issue + source snapshots -> render -> send to entitled subscribers ->
- * record deliveries -> mark sent. Every run is logged to pipeline_runs and
- * failures alert the admin by email. Logs contain status/usage only — never
- * key material or recipient PII beyond what the job requires.
+ * Run modes:
+ *   npm run brief:weekly   — the real daily run (name kept for history)
+ *   npm run brief:dry      — generate + store DRAFT only (never publishes,
+ *                            never sends; real runs regenerate over drafts)
  */
 import { generateBriefText } from "../lib/generation";
 import { parseBrief, renderBrief } from "../lib/renderBrief";
@@ -23,6 +28,13 @@ import {
 import { supabaseAdmin } from "../lib/supabase/admin";
 
 const DRY_RUN = process.argv.includes("--dry");
+
+interface IssueContent {
+  id: string;
+  subject: string;
+  html: string;
+  text: string;
+}
 
 async function startRun(): Promise<number | null> {
   const { data, error } = await supabaseAdmin()
@@ -67,24 +79,9 @@ async function storeIssue(params: {
   html: string;
   text: string;
   model: string;
-  status: "draft" | "needs_review";
-}): Promise<{ issueId: string; alreadySent: boolean }> {
+  publish: boolean;
+}): Promise<string> {
   const db = supabaseAdmin();
-
-  // Sent issues are immutable to the pipeline: a re-run in the same week
-  // (manual retry, dry rehearsal, scheduler double-fire) must never downgrade
-  // or rewrite what subscribers already received. (Bug found 2026-06-10: a
-  // post-send dry run downgraded the sent issue to draft, 404ing the archive
-  // link in the delivered email.)
-  const { data: existing } = await db
-    .from("issues")
-    .select("id, status")
-    .eq("week_label", params.inputs.weekLabel)
-    .maybeSingle();
-  if (existing && existing.status === "sent") {
-    return { issueId: existing.id as string, alreadySent: true };
-  }
-
   const { data, error } = await db
     .from("issues")
     .upsert(
@@ -95,8 +92,9 @@ async function storeIssue(params: {
         body_html: params.html,
         body_text: params.text,
         model: params.model,
-        status: params.status,
+        status: params.publish ? "sent" : "draft",
         generated_at: new Date().toISOString(),
+        sent_at: params.publish ? new Date().toISOString() : null,
       },
       { onConflict: "week_label" },
     )
@@ -107,7 +105,7 @@ async function storeIssue(params: {
   }
   const issueId = data.id as string;
 
-  // Source snapshots: small metadata only.
+  // Source snapshots: small metadata only; re-runs replace.
   const snapshots = [
     ...params.inputs.officialSummaries.map((s) => ({
       issue_id: issueId,
@@ -138,126 +136,146 @@ async function storeIssue(params: {
     })),
   ];
   if (snapshots.length > 0) {
-    // Idempotent-enough: clear and re-insert for this issue (re-runs replace).
     await db.from("source_snapshots").delete().eq("issue_id", issueId);
     const { error: snapError } = await db.from("source_snapshots").insert(snapshots);
     if (snapError) {
       console.error("[store] snapshot insert failed:", snapError.message);
     }
   }
-  return { issueId, alreadySent: false };
+  return issueId;
+}
+
+/** Generate this week's issue fresh and store it. Returns published content. */
+async function generateAndStore(
+  weekLabel: string,
+  publish: boolean,
+): Promise<IssueContent> {
+  const inputs = await collectBriefInputs();
+  console.log(
+    `[collect] ${inputs.weekLabel}: ${inputs.officialSummaries.length} official, ` +
+      `${inputs.commentaryHeadlines.length} headlines, ${inputs.indicators.length} indicators, ` +
+      `${inputs.warnings.length} warnings`,
+  );
+  for (const warning of inputs.warnings) {
+    console.warn(`[collect] warning: ${warning}`);
+  }
+  if (inputs.indicators.length === 0 && inputs.officialSummaries.length === 0) {
+    throw new Error("no usable inputs collected — refusing to generate from nothing");
+  }
+  if (inputs.weekLabel !== weekLabel) {
+    throw new Error(
+      `week label drift: expected ${weekLabel}, collected ${inputs.weekLabel}`,
+    );
+  }
+
+  const generation = await generateBriefText(buildUserMessage(inputs));
+  if (generation.status === "needs_review" || !generation.text) {
+    throw new NeedsReviewError(
+      `generation needs review: ${generation.detail ?? "no text"}`,
+    );
+  }
+  if (generation.detail) {
+    console.warn(`[generate] note: ${generation.detail}`);
+  }
+
+  const parsed = parseBrief(generation.text);
+  const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
+  const rendered = renderBrief(parsed.markdown, {
+    weekLabel: inputs.weekLabel,
+    archiveUrl: `${baseUrl}/issues/${inputs.weekLabel}`,
+  });
+
+  const issueId = await storeIssue({
+    inputs,
+    subject: parsed.subject,
+    markdown: parsed.markdown,
+    html: rendered.html,
+    text: rendered.text,
+    model: generation.model,
+    publish,
+  });
+  console.log(
+    `[store] issue ${inputs.weekLabel} ${publish ? "published" : "stored as draft"} (${issueId})`,
+  );
+  return { id: issueId, subject: parsed.subject, html: rendered.html, text: rendered.text };
+}
+
+class NeedsReviewError extends Error {}
+
+function isoWeekLabelToday(): string {
+  // Reuse the same implementation as sources to avoid drift.
+  const d = new Date();
+  const utc = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = utc.getUTCDay() || 7;
+  utc.setUTCDate(utc.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((utc.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${utc.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
 async function main(): Promise<void> {
-  console.log(`[weekly-brief] pipeline starting${DRY_RUN ? " (dry run)" : ""}`);
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const weekLabel = isoWeekLabelToday();
+  console.log(
+    `[weekly-brief] daily run starting${DRY_RUN ? " (dry)" : ""}: ${weekLabel}, day=${dayOfWeek}`,
+  );
   const runId = await startRun();
 
   try {
-    // 1. Collect
-    const inputs = await collectBriefInputs();
-    console.log(
-      `[collect] ${inputs.weekLabel}: ${inputs.officialSummaries.length} official, ` +
-        `${inputs.commentaryHeadlines.length} headlines, ${inputs.indicators.length} indicators, ` +
-        `${inputs.warnings.length} warnings`,
-    );
-    for (const warning of inputs.warnings) {
-      console.warn(`[collect] warning: ${warning}`);
-    }
-    if (inputs.indicators.length === 0 && inputs.officialSummaries.length === 0) {
-      throw new Error("no usable inputs collected — refusing to generate from nothing");
-    }
-
-    // Early exit BEFORE spending any generation: sent issues are immutable.
-    // (The same guard exists inside storeIssue as race protection.)
-    const { data: existingIssue } = await supabaseAdmin()
+    // 1. Ensure this week's issue exists (published issues are immutable).
+    const { data: existing } = await supabaseAdmin()
       .from("issues")
-      .select("id, status")
-      .eq("week_label", inputs.weekLabel)
+      .select("id, status, subject, body_html, body_text")
+      .eq("week_label", weekLabel)
       .maybeSingle();
-    if (existingIssue?.status === "sent") {
-      const detail = `issue ${inputs.weekLabel} already sent — no-op (sent issues are immutable)`;
-      await finishRun(runId, "success", detail, existingIssue.id as string);
-      console.log(`[weekly-brief] ${detail}`);
-      return;
-    }
 
-    // 2. Generate
-    const generation = await generateBriefText(buildUserMessage(inputs));
-    if (generation.status === "needs_review" || !generation.text) {
-      const detail = `generation needs review: ${generation.detail ?? "no text"}`;
-      await finishRun(runId, "needs_review", detail);
-      await sendAdminAlert("weekly brief needs review", detail);
-      console.error(`[weekly-brief] ${detail}`);
-      process.exitCode = 1;
-      return;
+    let issue: IssueContent;
+    if (existing && existing.status === "sent") {
+      issue = {
+        id: existing.id as string,
+        subject: existing.subject as string,
+        html: existing.body_html as string,
+        text: existing.body_text as string,
+      };
+      console.log(`[issue] reusing published issue ${weekLabel}`);
+    } else {
+      // Drafts (from dry rehearsals) are regenerated fresh — generation is free.
+      issue = await generateAndStore(weekLabel, !DRY_RUN);
     }
-    if (generation.detail) {
-      console.warn(`[generate] note: ${generation.detail}`);
-    }
-
-    // 3. Parse + render
-    const parsed = parseBrief(generation.text);
-    const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
-    const rendered = renderBrief(parsed.markdown, {
-      weekLabel: inputs.weekLabel,
-      archiveUrl: `${baseUrl}/issues/${inputs.weekLabel}`,
-    });
-
-    // 4. Store
-    const stored = await storeIssue({
-      inputs,
-      subject: parsed.subject,
-      markdown: parsed.markdown,
-      html: rendered.html,
-      text: rendered.text,
-      model: generation.model,
-      status: "draft",
-    });
-    if (stored.alreadySent) {
-      const detail = `issue ${inputs.weekLabel} already sent — no-op (sent issues are immutable)`;
-      await finishRun(runId, "success", detail, stored.issueId);
-      console.log(`[weekly-brief] ${detail}`);
-      return;
-    }
-    const issueId = stored.issueId;
-    console.log(`[store] issue ${inputs.weekLabel} stored (${issueId})`);
 
     if (DRY_RUN) {
-      await finishRun(runId, "success", "dry run: issue stored as draft, no send", issueId);
-      console.log("[weekly-brief] dry run complete — draft stored, nothing sent");
+      await finishRun(
+        runId,
+        "success",
+        existing?.status === "sent"
+          ? "dry run: issue already published; nothing to do"
+          : "dry run: draft stored, not published, nothing sent",
+        issue.id,
+      );
+      console.log("[weekly-brief] dry run complete");
       return;
     }
 
-    // 5. Send + mark sent
+    // 2. Deliver to today's recipients (idempotent).
     const report = await sendIssueEmail({
-      issueId,
-      subject: parsed.subject,
-      html: rendered.html,
-      text: rendered.text,
+      issueId: issue.id,
+      subject: issue.subject,
+      html: issue.html,
+      text: issue.text,
+      forDay: dayOfWeek,
     });
-    console.log(
-      `[send] attempted=${report.attempted} sent=${report.sent} failed=${report.failed}`,
-    );
-
-    const { error: markError } = await supabaseAdmin()
-      .from("issues")
-      .update({ status: "sent", sent_at: new Date().toISOString() })
-      .eq("id", issueId);
-    if (markError) {
-      console.error("[store] failed to mark issue sent:", markError.message);
-    }
-
     const detail =
-      `issue ${inputs.weekLabel} (${generation.model}): ` +
-      `${report.sent}/${report.attempted} delivered, ${report.failed} failed` +
-      (inputs.warnings.length > 0 ? `; ${inputs.warnings.length} collect warnings` : "");
-    await finishRun(runId, "success", detail, issueId);
+      `issue ${weekLabel}, day ${dayOfWeek}: sent ${report.sent}/${report.attempted}` +
+      `, failed ${report.failed}, already-delivered ${report.skippedAlreadyDelivered}`;
+    await finishRun(runId, "success", detail, issue.id);
     console.log(`[weekly-brief] done: ${detail}`);
   } catch (err) {
     const detail = (err as Error).message;
-    console.error("[weekly-brief] pipeline failed:", detail);
-    await finishRun(runId, "failed", detail);
-    await sendAdminAlert("weekly brief pipeline FAILED", detail);
+    const status = err instanceof NeedsReviewError ? "needs_review" : "failed";
+    console.error(`[weekly-brief] pipeline ${status}:`, detail);
+    await finishRun(runId, status, detail);
+    await sendAdminAlert(`weekly brief pipeline ${status}`, detail);
     process.exitCode = 1;
   }
 }

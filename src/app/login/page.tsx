@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { LoginForm } from "@/components/LoginForm";
+import { SiteFooter } from "@/components/SiteFooter";
+import { SiteHeader } from "@/components/SiteHeader";
 
 export const metadata: Metadata = {
   title: "Sign in — Weekly Finance Brief",
@@ -16,31 +18,38 @@ export default async function LoginPage({
   const hadError = params.error === "auth";
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 font-sans text-zinc-900 dark:bg-black dark:text-zinc-50">
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-8 px-6 py-24">
-        <header className="flex flex-col gap-3">
-          <Link
-            href="/"
-            className="text-sm font-medium uppercase tracking-widest text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-          >
-            Weekly Finance Brief
-          </Link>
-          <h1 className="text-3xl font-semibold tracking-tight">Sign in</h1>
-          <p className="text-base text-zinc-600 dark:text-zinc-400">
-            No password needed — we’ll email you a magic link.
+    <div className="flex min-h-full flex-1 flex-col bg-zinc-950 font-sans text-zinc-50">
+      <SiteHeader />
+      <main className="glow flex flex-1 items-center justify-center px-6 py-24">
+        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-900/70 p-8 shadow-2xl shadow-black/40 backdrop-blur">
+          <div className="mb-7 flex flex-col gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+            <p className="text-[15px] leading-7 text-zinc-400">
+              No password needed — we’ll email you a magic link.
+            </p>
+          </div>
+          {hadError && (
+            <p
+              role="alert"
+              className="mb-5 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-300"
+            >
+              That sign-in link didn’t work (it may have expired). Please
+              request a new one.
+            </p>
+          )}
+          <LoginForm />
+          <p className="mt-6 text-center text-sm text-zinc-500">
+            New here?{" "}
+            <Link
+              href="/#signup"
+              className="font-medium text-emerald-300 underline-offset-4 hover:underline"
+            >
+              Start your free week
+            </Link>
           </p>
-        </header>
-        {hadError && (
-          <p
-            role="alert"
-            className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
-          >
-            That sign-in link didn’t work (it may have expired). Please request
-            a new one.
-          </p>
-        )}
-        <LoginForm />
+        </div>
       </main>
+      <SiteFooter />
     </div>
   );
 }

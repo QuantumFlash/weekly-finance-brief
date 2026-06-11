@@ -2,6 +2,19 @@
 
 Running log: date, what changed, what's next. Newest first.
 
+## 2026-06-11 — Session 4: M5 — modern UI, free trial, per-day delivery
+
+**Done:**
+- Migration 0003 `profiles` (delivery_day 0-6, trial_ends_at, welcomed_at; RLS read/update own) — applied via still-live dashboard session
+- Trial signup: `/api/signup` (find-or-create user, 7-day card-less trial never reset on re-signup, no email enumeration) + branded welcome email; `/api/profile/day` (RLS-scoped update + legacy-account fallback insert)
+- Pipeline → DAILY 07:00: issue generated once per ISO week (published immediately), delivered per-user on their chosen day; idempotent (already-delivered skip); scheduler re-registered
+- UI overhaul: dark/emerald design system — SiteHeader/SiteFooter, hero w/ product mock, about-us, how-it-works, day-picker SignupForm (#signup), restyled login/account (trial banner, day selector)/archive/issue pages; WaitlistForm removed (route kept)
+- E2E: UI signup (+trial alias, Friday) → profile day=5, trial +7d exactly ✓; owner signup → welcome email DELIVERED ✓
+- **Deliverability bisection (3 rounds of A/B probes):** plain emails deliver in seconds; emails embedding the Supabase auth action_link are silently dropped; phish-pattern SUBJECTS ("sign-in link", "free week starts now") also dropped even with clean bodies. Fixes: welcome email carries no auth link (points to /login; Supabase's own sender handles magic links — proven deliverable) + informational subjects. Copy bug fixed: returning-vs-new keys off user, not profile.
+- Cleanup: +trial test user deleted (cascades profile); screenshots in repo (docs-assets-*.png)
+
+**Next:** Friday/Monday automated runs exercise per-day delivery in production; domain verification remains the unlock for non-owner recipients.
+
 ## 2026-06-10 — Session 3 (coda): Gemini primary live, retry ladder, sent-immutability bug fixed
 
 - Archi's Gemini key verified (new `AQ.` key format — probe beats priors); /v1beta/models listed the full 2026 lineup → pinned **gemini-3.5-flash** (newest stable flash)

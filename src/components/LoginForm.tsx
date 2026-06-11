@@ -34,7 +34,7 @@ export function LoginForm() {
     return (
       <p
         role="status"
-        className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-base text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+        className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-4 text-base text-emerald-200"
       >
         Check your inbox — we’ve emailed you a sign-in link.
       </p>
@@ -42,32 +42,30 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <label htmlFor="login-email" className="sr-only">
-          Email address
-        </label>
-        <input
-          id="login-email"
-          type="email"
-          required
-          autoComplete="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={status === "submitting"}
-          className="h-12 flex-1 rounded-lg border border-zinc-300 bg-white px-4 text-base text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-zinc-900 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:focus:border-zinc-300"
-        />
-        <button
-          type="submit"
-          disabled={status === "submitting"}
-          className="h-12 rounded-lg bg-zinc-900 px-6 text-base font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
-        >
-          {status === "submitting" ? "Sending…" : "Email me a sign-in link"}
-        </button>
-      </div>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <label htmlFor="login-email" className="sr-only">
+        Email address
+      </label>
+      <input
+        id="login-email"
+        type="email"
+        required
+        autoComplete="email"
+        placeholder="you@example.com"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        disabled={status === "submitting"}
+        className="h-12 rounded-xl border border-white/10 bg-white/5 px-4 text-base text-zinc-50 outline-none transition-all placeholder:text-zinc-500 focus:border-emerald-400/60 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.15)] disabled:opacity-60"
+      />
+      <button
+        type="submit"
+        disabled={status === "submitting"}
+        className="h-12 rounded-xl bg-emerald-400 text-base font-semibold text-emerald-950 transition-all hover:bg-emerald-300 disabled:opacity-60"
+      >
+        {status === "submitting" ? "Sending…" : "Email me a sign-in link"}
+      </button>
       {status === "error" && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-sm text-red-400">
           {message}
         </p>
       )}

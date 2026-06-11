@@ -68,7 +68,7 @@ export default function Home() {
           <div className="mx-auto grid w-full max-w-6xl gap-14 px-6 pb-24 pt-20 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:pt-28">
             <div className="flex flex-col items-start gap-6">
               <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3.5 py-1.5 text-xs font-medium text-emerald-300">
-                7 days free · No card required
+                7 days free · $0 today · Cancel anytime
               </span>
               <h1 className="text-balance text-4xl font-semibold leading-[1.1] tracking-tight sm:text-5xl lg:text-6xl">
                 The week in markets,{" "}
@@ -173,7 +173,7 @@ export default function Home() {
                 {
                   step: "01",
                   title: "Sign up & pick your day",
-                  body: "Just your email and the weekday you want your brief — Monday coffee or Sunday reset, your call. Free for 7 days, no card.",
+                  body: "Your email, your weekday, and a card on file (nothing charged for 7 days) — Monday coffee or Sunday reset, your call.",
                 },
                 {
                   step: "02",
@@ -211,9 +211,9 @@ export default function Home() {
               </p>
               <ul className="mt-2 flex flex-col gap-2.5 text-[15px] text-zinc-300">
                 {[
-                  "7-day free trial, no card required",
+                  "7-day free trial — $0 today, secured by card",
                   "Pick your delivery day, change it anytime",
-                  "$5/month after — cancel in two clicks",
+                  "$5/month after — cancel in two clicks, anytime",
                 ].map((li) => (
                   <li key={li} className="flex items-center gap-2.5">
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-400/15 text-[11px] text-emerald-300">

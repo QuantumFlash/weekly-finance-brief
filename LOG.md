@@ -2,6 +2,16 @@
 
 Running log: date, what changed, what's next. Newest first.
 
+## 2026-06-11 — Session 4 (cont.): card-gated free trial (anti-abuse)
+
+- Product decision (Archi): trials require a card to stop multi-account farming.
+- `createSubscriptionCheckout` in lib/billing: Checkout `mode=subscription` with `trial_period_days: 7` ONLY for customers with zero prior subscriptions; card always collected; shared by /api/signup AND the account-page subscribe button.
+- Signup flow: /api/signup returns the Checkout URL (client redirects); new `/welcome` page verifies the session server-side (webhook-free) and sends the welcome email exactly once (`welcomed_at` idempotency).
+- Entitlement simplified to Stripe-only (active/trialing/past_due); app-level trial helpers removed (profiles.trial_ends_at = legacy column); account page shows the trial from Stripe status with convert-date + cancel guidance; all "no card required" copy corrected.
+- **E2E verified:** fresh signup (Wednesday) → Checkout URL → 4242 → /welcome "Your free week has started" → Stripe: `trialing`, trial_end +7d exactly, invoice amount_due=0 PAID. Test customer + user fully cleaned up after.
+
+**Next:** unchanged — domain verification is the growth unlock; daily 07:00 automation continues.
+
 ## 2026-06-11 — Session 4: M5 — modern UI, free trial, per-day delivery
 
 **Done:**

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { isEntitled, syncSubscriptionForUser } from "../../../lib/billing";
-import { DAY_NAMES, trialActive, trialDaysLeft, type Profile } from "../../../lib/profile";
+import { DAY_NAMES, type Profile } from "../../../lib/profile";
 import { createSupabaseServerClient } from "../../../lib/supabase/server";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -49,10 +49,16 @@ export default async function AccountPage({
     .eq("user_id", user.id)
     .maybeSingle();
   const profile = (profileRow as Profile | null) ?? null;
-  const onTrial = trialActive(profile);
-  const daysLeft = trialDaysLeft(profile);
   const deliveryDay = profile?.delivery_day ?? 1;
-  const entitled = subEntitled || onTrial;
+  const entitled = subEntitled;
+  const trialing = subscription.status === "trialing";
+  const periodEndText = subscription.current_period_end
+    ? new Date(subscription.current_period_end).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
 
   const { data: issues } = await supabase
     .from("issues")
@@ -107,47 +113,40 @@ export default async function AccountPage({
           </p>
         )}
 
-        {/* Trial state */}
-        {onTrial && !subEntitled && (
+        {/* Trial state (lives in Stripe: status === trialing) */}
+        {trialing && (
           <div className="flex flex-col gap-3 rounded-3xl border border-emerald-400/25 bg-emerald-400/[0.07] p-7">
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-lg font-semibold text-emerald-200">
                 Free trial active
               </h2>
-              <StatusBadge
-                good
-                label={daysLeft === 1 ? "1 day left" : `${daysLeft} days left`}
-              />
+              <StatusBadge good label="trialing" />
             </div>
             <p className="text-[15px] leading-7 text-zinc-300">
-              You’re getting the full Weekly Finance Brief. Subscribe before
-              your trial ends to keep it coming — $5/month, cancel anytime.
+              You’re getting the full Weekly Finance Brief.
+              {periodEndText &&
+                ` Your trial converts to $5/month on ${periodEndText} —`}{" "}
+              cancel anytime before then from “Manage billing” and you won’t
+              be charged.
             </p>
-            <form action="/api/billing/checkout" method="POST">
-              <button
-                type="submit"
-                className="h-11 rounded-xl bg-emerald-400 px-6 text-sm font-semibold text-emerald-950 transition-all hover:bg-emerald-300"
-              >
-                Subscribe — $5/month
-              </button>
-            </form>
           </div>
         )}
         {!entitled && (
           <div className="flex flex-col gap-3 rounded-3xl border border-amber-400/25 bg-amber-400/[0.06] p-7">
             <h2 className="text-lg font-semibold text-amber-200">
-              Your free trial has ended
+              No active subscription
             </h2>
             <p className="text-[15px] leading-7 text-zinc-300">
-              Subscribe to keep receiving your weekly brief on{" "}
-              {DAY_NAMES[deliveryDay]}s.
+              Start your subscription to receive the brief on{" "}
+              {DAY_NAMES[deliveryDay]}s. New members get the first week free
+              ($0 today, card required).
             </p>
             <form action="/api/billing/checkout" method="POST">
               <button
                 type="submit"
                 className="h-11 rounded-xl bg-emerald-400 px-6 text-sm font-semibold text-emerald-950 transition-all hover:bg-emerald-300"
               >
-                Subscribe — $5/month
+                Start — $5/month after free week
               </button>
             </form>
           </div>
@@ -201,9 +200,7 @@ export default async function AccountPage({
                   label={
                     subEntitled
                       ? subscription.status.replace(/_/g, " ")
-                      : onTrial
-                        ? "free trial"
-                        : "no subscription"
+                      : "no subscription"
                   }
                 />
               </dd>

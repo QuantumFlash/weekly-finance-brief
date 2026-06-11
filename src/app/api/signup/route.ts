@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 
-import { signupWithTrial } from "../../../../lib/signup";
+import { createSubscriptionCheckout } from "../../../../lib/billing";
+import { ensureProfile, findOrCreateUser } from "../../../../lib/signup";
 
 /**
- * POST /api/signup — free-trial signup with delivery-day choice.
- * Response is always generic on success paths: never reveals whether the
- * email already had an account (no enumeration).
+ * POST /api/signup — card-gated free-trial signup.
+ * Creates/finds the user, stores the delivery-day profile, and returns a
+ * Stripe Checkout URL (7-day trial for first-time customers, card required,
+ * $0 today). Generic responses — no email enumeration.
  */
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -45,8 +47,14 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    await signupWithTrial(normalised, day);
-    return NextResponse.json({ ok: true });
+    const { userId } = await findOrCreateUser(normalised);
+    await ensureProfile(userId, day);
+    const { url } = await createSubscriptionCheckout({
+      userId,
+      email: normalised,
+      origin: new URL(request.url).origin,
+    });
+    return NextResponse.json({ ok: true, url });
   } catch (err) {
     console.error("[signup] failed:", (err as Error).message);
     return NextResponse.json(

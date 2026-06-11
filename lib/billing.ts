@@ -155,3 +155,46 @@ export async function syncSubscriptionForUser(
 export function isEntitled(status: string): boolean {
   return status === "active" || status === "trialing" || status === "past_due";
 }
+
+/**
+ * Creates a subscription Checkout session. Card is ALWAYS collected (abuse
+ * guard); the 7-day free trial is applied only if this customer has never
+ * had a subscription before — repeat signups can't farm trials, and the same
+ * helper safely serves the account page's subscribe button.
+ */
+export async function createSubscriptionCheckout(params: {
+  userId: string;
+  email: string;
+  origin: string;
+}): Promise<{ url: string; withTrial: boolean }> {
+  const { ensureMonthlyPriceId } = await import("./stripe");
+  const customerId = await getOrCreateCustomerId(params.userId, params.email);
+  const s = stripe();
+
+  const prior = await s.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 1,
+  });
+  const withTrial = prior.data.length === 0;
+
+  const priceId = await ensureMonthlyPriceId();
+  const session = await s.checkout.sessions.create({
+    mode: "subscription",
+    customer: customerId,
+    line_items: [{ price: priceId, quantity: 1 }],
+    ...(withTrial ? { subscription_data: { trial_period_days: 7 } } : {}),
+    success_url: `${params.origin}/welcome?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${params.origin}/#signup`,
+    metadata: { user_id: params.userId },
+  });
+  if (!session.url) {
+    throw new Error("Checkout session has no URL");
+  }
+  await logSubscriptionEvent("checkout.created", {
+    userId: params.userId,
+    stripeCustomerId: customerId,
+    payload: { withTrial },
+  });
+  return { url: session.url, withTrial };
+}

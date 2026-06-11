@@ -40,9 +40,11 @@ export function SignupForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: normalised, deliveryDay: day }),
       });
-      const data: { ok?: boolean; error?: string } = await res.json();
-      if (res.ok && data.ok) {
+      const data: { ok?: boolean; url?: string; error?: string } = await res.json();
+      if (res.ok && data.ok && data.url) {
         setStatus("success");
+        // Off to Stripe: card secured there, $0 due today on the trial.
+        window.location.href = data.url;
       } else {
         setStatus("error");
         setMessage(data.error ?? "Something went wrong — please try again.");
@@ -60,11 +62,11 @@ export function SignupForm() {
         className="flex flex-col gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-6"
       >
         <p className="text-lg font-semibold text-emerald-300">
-          Check your inbox — your free week has started. 🎉
+          Taking you to secure checkout…
         </p>
         <p className="text-sm leading-6 text-zinc-300">
-          We’ve sent you a welcome email with your sign-in link. Your first
-          brief lands on <strong>{selectedDay.full}</strong>.
+          Card details are handled by Stripe. Nothing is charged today — your
+          first brief lands on <strong>{selectedDay.full}</strong>.
         </p>
       </div>
     );
@@ -133,7 +135,7 @@ export function SignupForm() {
         {status === "submitting" ? "Setting up your free week…" : "Start my free week"}
       </button>
       <p className="text-center text-xs text-zinc-500">
-        7 days free · No card required · Cancel anytime
+        7 days free · $0 today, card required · Cancel anytime before day 7
       </p>
       {status === "error" && (
         <p role="alert" className="text-sm text-red-400">

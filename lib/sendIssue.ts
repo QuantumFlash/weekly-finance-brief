@@ -2,7 +2,7 @@ import { Resend } from "resend";
 
 import { isEntitled } from "./billing";
 import { env } from "./env";
-import { trialActive, type Profile } from "./profile";
+import type { Profile } from "./profile";
 import { supabaseAdmin } from "./supabase/admin";
 
 let resendClient: Resend | null = null;
@@ -22,9 +22,10 @@ export interface SendReport {
 }
 
 /**
- * Entitled = active/trialing/past_due Stripe subscription OR active free
- * trial on the profile. When `forDay` is given (0=Sun..6=Sat), only users
- * whose chosen delivery day matches are returned (no profile -> Monday).
+ * Entitled = Stripe active/trialing/past_due ONLY (card-gated trials live in
+ * Stripe as `trialing` subscriptions; the legacy app-level trial is gone).
+ * When `forDay` is given (0=Sun..6=Sat), only users whose chosen delivery
+ * day matches are returned (no profile -> Monday).
  */
 export async function listEntitledRecipients(
   forDay?: number,
@@ -53,8 +54,7 @@ export async function listEntitledRecipients(
   const recipients: Array<{ email: string; userId: string }> = [];
   for (const userId of userIds) {
     const profile = profByUser.get(userId) ?? null;
-    const entitled =
-      isEntitled(statusByUser.get(userId) ?? "none") || trialActive(profile);
+    const entitled = isEntitled(statusByUser.get(userId) ?? "none");
     if (!entitled) {
       continue;
     }

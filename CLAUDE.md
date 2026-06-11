@@ -52,10 +52,10 @@ Next.js app serves landing + auth + account + per-issue archive pages, plus API 
 - `deliveries` — who got which issue, when, send result (unique issue+email = idempotent re-runs)
 - `source_snapshots` — small metadata about inputs used per issue (titles/urls/dates only)
 
-## Product flow (M5: trial + per-day delivery)
+## Product flow (M5.1: card-gated trial + per-day delivery)
 
-- **Signup** (home page): email + delivery-day picker → `/api/signup` → find-or-create auth user → profile with 7-day trial (no card) → branded welcome email immediately (Resend). Sign-in stays magic-link via Supabase's own sender.
-- **Entitled** = Stripe active/trialing/past_due OR active trial. Day changeable from /account.
+- **Signup** (home page): email + delivery-day picker → `/api/signup` → find-or-create user + profile (day) → **Stripe Checkout with `trial_period_days: 7`** (card required, $0 today — abuse guard: trial only for customers with zero prior subscriptions, so repeat emails can't farm trials and fresh emails still need a card) → `/welcome?session_id=` verifies the session server-side (no webhook needed) and sends the branded welcome email once (idempotent via `welcomed_at`). Sign-in stays magic-link via Supabase's own sender.
+- **Entitled** = Stripe active/trialing/past_due ONLY (the app-level trial in `profiles.trial_ends_at` is legacy, no longer granted). Day changeable from /account; trial cancellation via the Stripe portal ("Manage billing") before day 8 = no charge.
 - **Pipeline runs DAILY 07:00**: generates the week's issue on the first run of the ISO week (publishes to archive), then each day delivers to entitled users whose delivery_day == today. Fully idempotent.
 - **Email deliverability lessons (2026-06-11, bisected live):** (1) never embed Supabase auth-verify links in app emails — silently dropped as phishing; (2) avoid phish-pattern SUBJECTS ("sign-in link", "free week starts now") on the sandbox sender — use informational subjects ("Weekly Finance Brief: first issue lands Friday"). Plain/neutral content delivers in seconds.
 

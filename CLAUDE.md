@@ -71,7 +71,8 @@ Update checkboxes + `LOG.md` whenever a milestone lands.
 
 ## Runbook (PRODUCTION — deployed 2026-06-11)
 
-- **Live site:** https://weekly-finance-brief.vercel.app (Vercel, auto-deploys on `git push` to main via the GitHub connection). Project: `weekly-financial-brief/weekly-finance-brief`. Repo: `github.com/QuantumFlash/weekly-finance-brief`.
+- **Live site:** https://weekly-finance-brief.vercel.app. Project: `weekly-financial-brief/weekly-finance-brief`. Repo: `github.com/QuantumFlash/weekly-finance-brief`.
+- **Deploying code changes:** `vercel deploy --prod` from the repo dir (manual). GitHub→Vercel auto-deploy-on-push is NOT connected (would need a Vercel↔GitHub "Login Connection" — optional convenience; the GitHub Actions cron does NOT depend on it). If a CLI deploy hits `ECONNRESET` mid-poll, the build usually still completes — check `vercel ls`.
 - **Hosted cron:** GitHub Actions `.github/workflows/daily-brief.yml` runs daily 05:00 UTC (07:00 CET) on Node 22 — `npm ci` then the pipeline script. Secrets set in repo Settings → Secrets (Actions). Verified green 2026-06-11 (reused W24, 0 delivered on a non-delivery day). Manual run: Actions tab → Run workflow, or `gh workflow run daily-brief.yml`.
 - **Stripe webhook:** live endpoint `…/api/stripe/webhook` registered via API (`we_1Th0yeBLNSfFAnq81mLSJYi1`, test mode), `STRIPE_WEBHOOK_SECRET` in Vercel + `.env.local`. Events: `customer.subscription.*`, `invoice.paid/payment_failed`.
 - **Env vars:** in BOTH Vercel (runtime) and GitHub Actions (cron). ⚠ **NEVER pipe values to `vercel env add`/`gh secret set` from PowerShell 5.1 — it prepends a UTF-8 BOM (U+FEFF) that corrupts header values (`Cannot convert argument to a ByteString …65279`).** Use `gh secret set --body`, or Node `spawnSync(..., {input: Buffer.from(v,'utf8')})` for Vercel. Vercel marks them Sensitive (can't `env pull` plaintext — expected).

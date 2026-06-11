@@ -23,7 +23,7 @@ A low-touch subscription micro-SaaS: a concise weekly macro & markets brief for 
 |---|---|---|
 | Web app | Next.js (App Router, TS, Tailwind, `src/`) | Landing, auth, account, issue archive |
 | DB + Auth | Supabase (managed Postgres) | Magic-link auth preferred (less to build/secure) |
-| Billing | Stripe subscriptions (monthly, auto-renew) | Webhooks keep local state in sync; log all lifecycle events |
+| Billing | Stripe subscriptions (monthly, auto-renew) | **France account `acct_1Th4vuGlU4SM0UJi`, EUR, €5/mo** (replaced the un-fixable JP account `acct_1TgbuO…` — Stripe country is permanent; new account was the only path). Webhooks sync local state; Adaptive Pricing shows non-EUR visitors their local currency, merchant settles EUR. |
 | Email | Resend | Official client; dev sender `onboarding@resend.dev`, verified domain before launch |
 | AI | Claude Code CLI (subscription, $0) | See model routing below |
 | Weekly job | `scripts/generateWeeklyBrief.ts` | Triggered weekly via scheduled routine (/schedule) |

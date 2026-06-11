@@ -37,8 +37,8 @@ export async function ensureMonthlyPriceId(): Promise<string> {
   });
   const price = await s.prices.create({
     product: product.id,
-    unit_amount: 500,
-    currency: "usd",
+    unit_amount: 500, // €5.00 (EUR is 2-decimal). France account default currency.
+    currency: "eur",
     recurring: { interval: "month" },
     lookup_key: PRICE_LOOKUP_KEY,
   });

@@ -2,6 +2,15 @@
 
 Running log: date, what changed, what's next. Newest first.
 
+## 2026-06-11 — Session 6: Stripe account moved JP → France (payout fix)
+
+- Problem: Stripe account `acct_1TgbuO…` was country JP / JPY — can't pay out to Archi's French Revolut, and Stripe country is permanent (unchangeable). Caught via `GET /v1/account` before any live keys went in.
+- Fix: Archi created a new **France** account `acct_1Th4vuGlU4SM0UJi` (EUR); switched all Stripe test keys + price currency (USD→**EUR €5**) + webhook to it. Deleted the old JP webhook first.
+- Gotcha 1: first FR redeploy → signup 502 "connection to Stripe / retried 2 times". Cause: the encoding-pipe `vercel env add` wrote **broken/empty** Stripe values (the BOM-safe pipe failed this time). Fix: re-set all 4 via **Node spawnSync + Buffer.from** (bulletproof — used it for EMAIL_FROM/APP_BASE_URL too). Lesson: ALWAYS set Vercel secrets via Node Buffer, never the PS pipe.
+- Gotcha 2: checkout screenshot showed "JP¥963 / charge in JPY" → looked like still-on-JP. API proved otherwise: session `currency=eur` on the FR account, price = 500 EUR. The yen was **Stripe Adaptive Pricing** presenting EUR→JPY because the automation browser geolocates to Japan. A French visitor sees €5.00. Not a bug.
+- Verified: live signup on apex → checkout session on FR account, EUR. Test user + customer cleaned up.
+- Note: `env pull` shows CLI-added vars as `""` (sensitive/write-only masking) — NOT a reliable verifier; redeploy + live test is the real check.
+
 ## 2026-06-11 — Session 5 (security pass): production audit + CI hardening
 
 Final pre-customer security review of the money/auth/secrets surface — clean, no critical issues:

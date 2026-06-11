@@ -1,6 +1,8 @@
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { createSubscriptionCheckout } from "../../../../lib/billing";
+import { checkRateLimit } from "../../../../lib/rateLimit";
 import { ensureProfile, findOrCreateUser } from "../../../../lib/signup";
 
 /**
@@ -13,6 +15,19 @@ import { ensureProfile, findOrCreateUser } from "../../../../lib/signup";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request): Promise<NextResponse> {
+  // 5 signup attempts per IP per hour
+  const headerStore = await headers();
+  const ip =
+    headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    headerStore.get("x-real-ip") ??
+    "unknown";
+  if (!checkRateLimit(`signup:${ip}`, 5, 60 * 60_000)) {
+    return NextResponse.json(
+      { ok: false, error: "Too many requests — please try again later." },
+      { status: 429 },
+    );
+  }
+
   let email: unknown;
   let deliveryDay: unknown;
   try {

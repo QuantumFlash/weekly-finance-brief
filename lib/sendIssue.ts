@@ -4,6 +4,7 @@ import { isEntitled } from "./billing";
 import { env } from "./env";
 import type { Profile } from "./profile";
 import { supabaseAdmin } from "./supabase/admin";
+import { generateUnsubscribeToken } from "./unsubscribe";
 
 let resendClient: Resend | null = null;
 
@@ -81,6 +82,7 @@ export async function listEntitledRecipients(
 export async function sendIssueEmail(params: {
   issueId: string;
   subject: string;
+  /** Pre-rendered HTML (without unsubscribe link — added per recipient). */
   html: string;
   text: string;
   forDay?: number;
@@ -114,6 +116,19 @@ export async function sendIssueEmail(params: {
     }
     report.attempted += 1;
 
+    const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
+    const unsubToken = generateUnsubscribeToken(recipient.email);
+    const unsubUrl = `${baseUrl}/api/unsubscribe?email=${encodeURIComponent(recipient.email)}&token=${unsubToken}`;
+    // Inject the per-recipient unsubscribe link into the footer.
+    const personalHtml = params.html.replace(
+      /(<a href=")([^"]+)(">Unsubscribe<\/a>)/,
+      `$1${unsubUrl}$3`,
+    );
+    const personalText = params.text.replace(
+      /^Unsubscribe: .+$/m,
+      `Unsubscribe: ${unsubUrl}`,
+    );
+
     let status = "sent";
     let providerId: string | null = null;
     let errorText: string | null = null;
@@ -122,8 +137,12 @@ export async function sendIssueEmail(params: {
         from: `Weekly Finance Brief <${env.emailFrom()}>`,
         to: recipient.email,
         subject: params.subject,
-        html: params.html,
-        text: params.text,
+        html: personalHtml,
+        text: personalText,
+        headers: {
+          "List-Unsubscribe": `<${unsubUrl}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
       });
       if (error) {
         throw new Error(error.message);

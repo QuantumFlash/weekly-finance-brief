@@ -105,13 +105,17 @@ export function briefBodyHtml(markdown: string): string {
 
 export function renderBrief(
   markdown: string,
-  options: { weekLabel: string; archiveUrl?: string },
+  options: { weekLabel: string; archiveUrl?: string; unsubscribeUrl?: string },
 ): RenderedBrief {
   const htmlParts = [briefBodyHtml(markdown)];
 
   const archiveLine = options.archiveUrl
-    ? `Read on the web: ${options.archiveUrl} · `
+    ? `Read on the web: ${escapeHtml(options.archiveUrl)} · `
     : "";
+
+  const unsubLine = options.unsubscribeUrl
+    ? `<a href="${escapeHtml(options.unsubscribeUrl)}" style="color:#a1a1aa;">Unsubscribe</a>`
+    : "Manage your subscription from your account page.";
 
   const html = [
     `<!DOCTYPE html><html><body style="${STYLES.body}">`,
@@ -119,22 +123,22 @@ export function renderBrief(
     `<p style="${STYLES.brand}">Weekly Finance Brief · ${escapeHtml(options.weekLabel)}</p>`,
     ...htmlParts,
     `<div style="${STYLES.footer}">`,
-    `<p style="margin:0 0 6px;">${escapeHtml(archiveLine)}Manage your subscription from your account page.</p>`,
+    `<p style="margin:0 0 6px;">${archiveLine}${unsubLine}</p>`,
     `<p style="margin:0;">Educational information only — not investment advice, and never a recommendation to buy or sell anything.</p>`,
     "</div></div></body></html>",
   ].join("\n");
 
-  const text = [
+  const textParts = [
     `WEEKLY FINANCE BRIEF · ${options.weekLabel}`,
     "",
     markdown,
     "",
     "--",
-    options.archiveUrl ? `Read on the web: ${options.archiveUrl}` : "",
-    "Educational information only — not investment advice.",
-  ]
-    .filter((l) => l !== "")
-    .join("\n");
+  ];
+  if (options.archiveUrl) textParts.push(`Read on the web: ${options.archiveUrl}`);
+  if (options.unsubscribeUrl)
+    textParts.push(`Unsubscribe: ${options.unsubscribeUrl}`);
+  textParts.push("Educational information only — not investment advice.");
 
-  return { html, text };
+  return { html, text: textParts.join("\n") };
 }

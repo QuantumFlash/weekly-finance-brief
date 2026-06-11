@@ -16,12 +16,18 @@ export function SiteFooter() {
             recommendation to buy or sell anything.
           </p>
         </div>
-        <nav className="flex items-center gap-6 text-sm text-zinc-400">
+        <nav className="flex flex-wrap items-center gap-5 text-sm text-zinc-400">
           <Link href="/issues" className="transition-colors hover:text-zinc-100">
             Archive
           </Link>
           <Link href="/account" className="transition-colors hover:text-zinc-100">
             Account
+          </Link>
+          <Link href="/terms" className="transition-colors hover:text-zinc-100">
+            Terms
+          </Link>
+          <Link href="/privacy" className="transition-colors hover:text-zinc-100">
+            Privacy
           </Link>
           <Link href="/login" className="transition-colors hover:text-zinc-100">
             Sign in

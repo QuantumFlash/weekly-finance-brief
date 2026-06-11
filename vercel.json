@@ -1,0 +1,17 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm ci",
+  "framework": "nextjs",
+  "functions": {
+    "src/app/api/billing/checkout/route.ts": { "maxDuration": 30 },
+    "src/app/api/billing/portal/route.ts": { "maxDuration": 30 },
+    "src/app/api/signup/route.ts": { "maxDuration": 30 },
+    "src/app/welcome/page.tsx": { "maxDuration": 30 },
+    "src/app/api/stripe/webhook/route.ts": { "maxDuration": 30 },
+    "src/app/api/cron/brief/route.ts": { "maxDuration": 60 }
+  },
+  "env": {
+    "NEXT_TELEMETRY_DISABLED": "1"
+  }
+}

@@ -183,6 +183,8 @@ async function generateAndStore(
   const rendered = renderBrief(parsed.markdown, {
     weekLabel: inputs.weekLabel,
     archiveUrl: `${baseUrl}/issues/${inputs.weekLabel}`,
+    // Placeholder replaced per-recipient at send time (sendIssue.ts).
+    unsubscribeUrl: `${baseUrl}/api/unsubscribe?email=PLACEHOLDER&token=PLACEHOLDER`,
   });
 
   const issueId = await storeIssue({

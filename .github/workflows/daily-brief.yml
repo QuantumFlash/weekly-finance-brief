@@ -1,0 +1,44 @@
+name: Daily Brief Pipeline
+
+on:
+  schedule:
+    # 07:00 UTC daily. Adjust TZ offset if you want 07:00 local time.
+    # Sweden is UTC+1 (winter) / UTC+2 (summer) — 05:00 UTC = 07:00 CET
+    - cron: "0 5 * * *"
+  workflow_dispatch: # Allow manual runs from the GitHub Actions UI
+
+jobs:
+  generate:
+    name: Generate & deliver brief
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          # Claude CLI not available in CI — Gemini is primary, needs_review on failure
+          BRIEF_FALLBACK_CLI: "off"
+        run: node --import=tsx scripts/generateWeeklyBrief.ts

@@ -2,6 +2,19 @@
 
 Running log: date, what changed, what's next. Newest first.
 
+## 2026-06-11 — Session 5 (security pass): production audit + CI hardening
+
+Final pre-customer security review of the money/auth/secrets surface — clean, no critical issues:
+- **Service key never reaches client:** `supabaseAdmin` (SUPABASE_SERVICE_KEY) imported only in route handlers + the admin server component; the two `"use client"` files use the publishable key only. Verified by grep.
+- **Stripe webhook:** signature-verified before any processing; idempotent upsert sync.
+- **Admin page:** `getUser()` (server-validates JWT) + `email === ADMIN_EMAIL` + 404 concealment.
+- **Unsubscribe:** HMAC-SHA256 tokens, constant-time compare, no account enumeration, Stripe cancel non-blocking.
+- **Auth callback:** open-redirect guard (same-site relative only) — fixed earlier, confirmed.
+- Accepted/documented: in-memory rate limiter resets per serverless cold start + isn't shared across instances (weak) — but the REAL trial-abuse guard is the card requirement at Stripe checkout, so this is just defense-in-depth. CRON_SECRET doubles as the unsubscribe HMAC key (minor key-reuse, not exploitable).
+- **CI hardening:** bumped actions/checkout + setup-node v4→v6 (Node 24 runtime, silences the Node-20 deprecation); job still installs Node 22 for Supabase's WebSocket need. Verified green.
+
+Verdict: safe to take real customers once Stripe live keys are in. No code changes needed beyond the CI bump.
+
 ## 2026-06-11 — Session 5 (coda): apex domain live, keys rotated, CI green
 
 - **weeklyfinancebrief.com is the site** — domains added to Vercel project via CLI; A/CNAME written via Cloudflare API (DNS-only); SSL auto-provisioned; verified via curl --resolve (local router still negative-caching, world resolves fine); Vercel aliases production to the apex.

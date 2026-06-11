@@ -23,10 +23,14 @@ Verified in Resend, `EMAIL_FROM=brief@weeklyfinancebrief.com` everywhere, **stra
 
 Token cleanup when convenient: delete the full-access Resend key + Cloudflare DNS token (both transited chat, both done with their jobs). Optional polish: point the apex domain at Vercel so the site lives on weeklyfinancebrief.com.
 
+## Security
+
+Final production audit done 2026-06-11 (money/auth/secrets surface) — **clean, no critical issues**. Service key is server-only, webhook signature-verified, admin properly gated, unsubscribe HMAC-signed, open-redirect guarded. CI bumped to actions v6 (Node 24). Full notes in LOG. Verdict: safe for real customers once Stripe live keys are in.
+
 ## Nice-to-have later
 
-- Rotate keys that transited chat (Resend/Gemini/Supabase).
-- Node 20 deprecation warning on the GitHub Actions wrapper actions (cosmetic; bump checkout/setup-node to v4-latest before Sept 2026).
+- Resend `production-send-v2` key appeared in this transcript during the GitHub-secret step (send-only, bounded risk) — optional clean re-rotation needs a fresh `gh` login (one 2FA).
+- Rate limiter is in-memory (per-instance) — fine as defense-in-depth behind card-gating; upgrade to Upstash if abuse appears.
 - 2 moderate `npm audit` findings in scaffold deps.
 
 ## Economics

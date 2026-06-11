@@ -79,11 +79,17 @@ Update checkboxes + `LOG.md` whenever a milestone lands.
 - **Local dev:** `npm start` on `http://localhost:3000`; Startup-folder web launcher still present. Windows pipeline task `WeeklyFinanceBrief-Pipeline` is now **Disabled** (GitHub Actions is the cron). Manual pipeline: `npm run brief:weekly` / `brief:dry`.
 - **Migrations:** 0001+0002+0003 all applied (Supabase Dashboard SQL Editor). Supabase Auth redirect URLs include `https://*.vercel.app/auth/callback`.
 
+## Email domain (verified 2026-06-11) ✅
+
+- **weeklyfinancebrief.com** — registered at Cloudflare, verified in Resend (registration `1bb26722…`, region ap-northeast-1, created via Archi's dashboard onboarding; a duplicate API-created registration was deleted along with its conflicting DNS records — lesson: TWO registrations of one domain = duplicate SPF/MX = RFC-invalid = verification fails).
+- DNS: Cloudflare zone `ab0958bc…` — DKIM TXT + SPF TXT/MX on `send` (managed by Resend's integration) + `_dmarc` TXT (p=none).
+- `EMAIL_FROM=brief@weeklyfinancebrief.com` in `.env.local`, Vercel, and the GitHub Actions secret. **Stranger-delivery verified**: sends to non-owner addresses land in INBOX.
+
 ## Still needs Archi (business prerequisites, not code)
 
-1. **Resend domain** — until a domain is verified at resend.com/domains and `EMAIL_FROM` is updated (Vercel + GitHub secret), emails only deliver to the owner. THE growth blocker.
-2. **Stripe live keys** — currently test mode (`sk_test_`/`pk_test_`). For real charges: swap to live keys in Vercel, register a live-mode webhook, update `STRIPE_WEBHOOK_SECRET`.
-3. **Key rotation** — Resend/Gemini/Supabase keys transited chat; rotate when convenient.
+1. **Stripe live keys** — currently test mode (`sk_test_`/`pk_test_`). For real charges: swap to live keys in Vercel, register a live-mode webhook, update `STRIPE_WEBHOOK_SECRET`.
+2. **Token hygiene** — delete the full-access Resend key ("Weekly Financial Brief Onboarding" at resend.com/api-keys — production uses the separate send-only key) and the Cloudflare DNS token (dash.cloudflare.com/profile/api-tokens); both transited chat. Plus the older rotation list (send-only Resend key, Gemini, Supabase `sb_` pair).
+3. **Optional:** point the apex `weeklyfinancebrief.com` at the app (Cloudflare DNS → CNAME to Vercel + add domain in Vercel project settings) so the site lives on the real domain instead of `*.vercel.app`.
 
 ## Security & secrets
 

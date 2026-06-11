@@ -13,10 +13,15 @@
 - **Generation:** Gemini free tier (retry ladder), $0, off the owner's Claude account.
 - **Market-ready extras:** rate limiting, one-click unsubscribe, Terms + Privacy pages.
 
-## The 2 things that still need YOU (business, not code)
+## ✅ Domain LIVE: weeklyfinancebrief.com (2026-06-11)
 
-1. **Verify a Resend domain** (resend.com/domains) → then update `EMAIL_FROM` in Vercel + GitHub secret. **Until then, emails only reach you (the owner).** This is the single growth blocker — without it, new subscribers get no emails.
-2. **Switch Stripe to live keys** when ready for real money (currently test mode — checkout works but charges aren't real). Swap keys in Vercel, register a live webhook.
+Verified in Resend, `EMAIL_FROM=brief@weeklyfinancebrief.com` everywhere, **stranger-delivery proven** (non-owner inbox ✓). The product can email anyone. Growth blocker eliminated.
+
+## The 1 thing that still needs YOU (business, not code)
+
+**Switch Stripe to live keys** when ready for real money (currently test mode — checkout works but charges aren't real). Swap keys in Vercel, register a live webhook. Until then: fully functional product, fake money.
+
+Token cleanup when convenient: delete the full-access Resend key + Cloudflare DNS token (both transited chat, both done with their jobs). Optional polish: point the apex domain at Vercel so the site lives on weeklyfinancebrief.com.
 
 ## Nice-to-have later
 

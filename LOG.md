@@ -2,6 +2,15 @@
 
 Running log: date, what changed, what's next. Newest first.
 
+## 2026-06-11 — Session 5 (finale): DOMAIN LIVE — the last blocker falls
+
+- Archi bought **weeklyfinancebrief.com** (Cloudflare) + provided scoped tokens (Resend full-access, Cloudflare DNS-edit).
+- Added domain to Resend via API + wrote DKIM/SPF/MX/DMARC into Cloudflare via API → SPF verification FAILED → diagnosis: the zone already had a SECOND record set + the account a SECOND (verified!) domain registration — Archi's Resend dashboard onboarding had auto-set everything via their Cloudflare integration minutes earlier (region ap-northeast-1). Two registrations = duplicate SPF (RFC-invalid) + conflicting MX.
+- Fix: deleted MY duplicate registration + my 3 conflicting DNS records; kept the verified Tokyo registration + DMARC.
+- **Proofs:** test send from brief@weeklyfinancebrief.com via the PRODUCTION send-only key → INBOX ✓; send to a NON-OWNER address (+alias, previously rejected by sandbox) → INBOX ✓. Sandbox restriction fully lifted.
+- `EMAIL_FROM=brief@weeklyfinancebrief.com` rolled out: .env.local, Vercel (BOM-safe Node stdin), GitHub Actions secret (browser session), prod redeployed.
+- Remaining for Archi: Stripe live keys (test mode until then), token cleanup (full-access Resend key + CF DNS token), optional apex domain → Vercel.
+
 ## 2026-06-11 — Session 5: DEPLOYED TO PRODUCTION (Vercel + GitHub Actions cron)
 
 Done (everything I could without business prerequisites):

@@ -10,7 +10,7 @@ Landing → waitlist (DB row) · magic-link auth · Stripe test checkout → `ac
 
 ## Economics
 
-**$0/month to run** (CLI on existing Claude subscription; Supabase/Resend/Stripe-test/FRED free tiers). Revenue path live: $5/mo Stripe subscription (test mode). Switch-to-metered-API path documented in CLAUDE.md for when external customers arrive.
+**$0/month, off the owner's Claude account:** generation = Gemini free tier (`gemini-3.5-flash`, retry ladder, verified live); Claude CLI is emergency-fallback only (`BRIEF_FALLBACK_CLI=off` to forbid entirely). Supabase/Resend/Stripe-test/FRED all free tiers. Revenue path live: $5/mo Stripe subscription (test mode). Switch-to-metered-API path in CLAUDE.md for when external customers arrive.
 
 ## Normal week = zero manual work
 

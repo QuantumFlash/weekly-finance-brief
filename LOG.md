@@ -2,6 +2,14 @@
 
 Running log: date, what changed, what's next. Newest first.
 
+## 2026-06-10 — Session 3 (coda): Gemini primary live, retry ladder, sent-immutability bug fixed
+
+- Archi's Gemini key verified (new `AQ.` key format — probe beats priors); /v1beta/models listed the full 2026 lineup → pinned **gemini-3.5-flash** (newest stable flash)
+- First Gemini run 503'd ("high demand") and fell straight to the subscription CLI → added **retry ladder** (2 attempts/model, 20s backoff, then gemini-2.5-flash; fatal-abort only on 401/403). Proven live: 503 → backoff → success, CLI untouched, $0.
+- **Bug found & fixed:** post-send dry run downgraded the sent W24 issue to draft → archive 404 while the delivered email linked to it. Fix: sent issues are now immutable to the pipeline (early no-op before generation + race guard in storeIssue); W24 restored to `sent` with original sent_at (body is now the Gemini regeneration — the emailed copy was the Opus version; same facts, accepted drift, can't recur post-fix).
+- Cost state: weekly runs on Gemini free tier; the Claude account is touched only if the whole Gemini ladder fails (set `BRIEF_FALLBACK_CLI=off` to forbid even that).
+- Note: Gemini key transited chat — revocable/regenerable at aistudio.google.com/apikey anytime.
+
 ## 2026-06-10 — Session 3 (finale): migrations applied, backend made free, ISSUE #1 SHIPPED
 
 - Migrations applied via Supabase dashboard (Archi logged into the automation browser; SQL injected via Monaco API; destructive-op dialog confirmed) → all 7 tables verified over REST

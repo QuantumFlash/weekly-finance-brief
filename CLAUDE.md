@@ -32,7 +32,7 @@ A low-touch subscription micro-SaaS: a concise weekly macro & markets brief for 
 
 Provider chain in `lib/generation.ts` (pipeline only calls `generateBriefText()`):
 
-1. **Gemini free tier (PRIMARY)** — `lib/gemini.ts`, plain REST, `GEMINI_API_KEY` from Google AI Studio (no card, no Claude account, $0). Model env-overridable (`GEMINI_MODEL`, default gemini-2.5-flash — pin after probing available models with the real key).
+1. **Gemini free tier (PRIMARY)** — `lib/gemini.ts`, plain REST, `GEMINI_API_KEY` from Google AI Studio (no card, no Claude account, $0). Pinned `gemini-3.5-flash` (probed via /v1beta/models 2026-06-10). **Retry ladder:** 2 attempts/model with 20s backoff on 429/5xx, then `gemini-2.5-flash`, abort all only on 401/403 — a transient 503 never escalates to the owner's subscription (proven live: 503 → retry → success).
 2. **Claude Code CLI (EMERGENCY FALLBACK ONLY)** — `lib/claude.ts`, owner's subscription OAuth; only runs if Gemini fails; disable entirely with `BRIEF_FALLBACK_CLI=off`. (Was the primary 2026-06-10 and shipped issue #1 — proven path.) ANTHROPIC_API_KEY is stripped from the child env.
 3. **needs_review** — draft stored, admin alerted, send held.
 

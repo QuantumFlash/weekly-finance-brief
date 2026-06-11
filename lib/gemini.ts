@@ -12,7 +12,19 @@ export function geminiConfigured(): boolean {
 }
 
 export function geminiModel(): string {
-  return process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+  // Default verified available on this key 2026-06-10 (newest stable flash);
+  // override via GEMINI_MODEL. `gemini-flash-latest` is the rolling alias if
+  // auto-upgrades are ever preferred over a deterministic pin.
+  return process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
+}
+
+/**
+ * Preference-ordered Gemini models: pinned first, then an older-generation
+ * stable flash that tends to have spare capacity when the newest one is
+ * overloaded (observed 503 on 3.5-flash, 2026-06-10).
+ */
+export function geminiModelLadder(): string[] {
+  return [...new Set([geminiModel(), "gemini-2.5-flash"])];
 }
 
 interface GeminiResponse {
@@ -27,18 +39,22 @@ export interface ProviderResult {
   ok: boolean;
   text: string;
   detail: string;
+  /** Transient failure (429/5xx/timeout) — worth retrying the same model. */
+  retryable?: boolean;
+  /** Credential-level failure (401/403) — no point trying other models. */
+  fatal?: boolean;
 }
 
 export async function runBriefViaGemini(
+  model: string,
   system: string,
   userContent: string,
   timeoutMs: number,
 ): Promise<ProviderResult> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
-    return { ok: false, text: "", detail: "GEMINI_API_KEY not set" };
+    return { ok: false, text: "", detail: "GEMINI_API_KEY not set", fatal: true };
   }
-  const model = geminiModel();
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -62,7 +78,13 @@ export async function runBriefViaGemini(
 
     if (!res.ok) {
       const body = (await res.text()).slice(0, 400);
-      return { ok: false, text: "", detail: `gemini ${model} HTTP ${res.status}: ${body}` };
+      return {
+        ok: false,
+        text: "",
+        detail: `gemini ${model} HTTP ${res.status}: ${body.replace(/\s+/g, " ")}`,
+        retryable: res.status === 429 || res.status >= 500,
+        fatal: res.status === 401 || res.status === 403,
+      };
     }
 
     const json = (await res.json()) as GeminiResponse;
@@ -89,6 +111,7 @@ export async function runBriefViaGemini(
       ok: false,
       text: "",
       detail: `gemini error: ${(err as Error).name === "AbortError" ? `timeout after ${timeoutMs}ms` : (err as Error).message}`,
+      retryable: true,
     };
   } finally {
     clearTimeout(timer);

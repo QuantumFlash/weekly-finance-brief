@@ -3,19 +3,27 @@ import path from "node:path";
 
 import { BRIEF_GENERATION, MODELS } from "../config/models";
 import { cliFallbackEnabled, runBriefViaCli } from "./claude";
-import { geminiConfigured, geminiModel, runBriefViaGemini } from "./gemini";
+import { geminiConfigured, geminiModelLadder, runBriefViaGemini } from "./gemini";
 
 /**
  * Provider-agnostic brief generation with an ordered chain:
  *
  *   1. Gemini free tier (primary when GEMINI_API_KEY is set) — costs nothing,
- *      touches no Claude account.
+ *      touches no Claude account. Tries each model in the ladder with up to
+ *      ATTEMPTS_PER_MODEL attempts (backoff between retryable failures), so a
+ *      transient 503 never escalates straight to the owner's subscription
+ *      (observed: 3.5-flash "high demand" 503, 2026-06-10).
  *   2. Claude Code CLI (owner's subscription) — emergency fallback only;
  *      disable with BRIEF_FALLBACK_CLI=off.
  *   3. needs_review — caller stores the draft, alerts admin, holds the send.
  *
  * The pipeline only ever calls generateBriefText(); providers are plumbing.
  */
+
+const ATTEMPTS_PER_MODEL = 2;
+const RETRY_BACKOFF_MS = 20_000;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const PROMPT_MARKER =
   "## SYSTEM PROMPT — everything below this line is sent verbatim";
@@ -51,14 +59,35 @@ export async function generateBriefText(
   const user = `${userContent}\n\n${OUTPUT_REMINDER}`;
   const problems: string[] = [];
 
-  // 1. Gemini (free tier) — primary.
+  // 1. Gemini (free tier) — primary: model ladder × bounded retries.
   if (geminiConfigured()) {
-    const res = await runBriefViaGemini(system, user, BRIEF_GENERATION.timeoutMs);
-    console.log(`[generate] ${res.detail}`);
-    if (res.ok) {
-      return { text: res.text, model: geminiModel(), status: "ok" };
+    gemini: for (const model of geminiModelLadder()) {
+      for (let attempt = 1; attempt <= ATTEMPTS_PER_MODEL; attempt++) {
+        const res = await runBriefViaGemini(
+          model,
+          system,
+          user,
+          BRIEF_GENERATION.timeoutMs,
+        );
+        console.log(`[generate] ${res.detail} (attempt ${attempt}/${ATTEMPTS_PER_MODEL})`);
+        if (res.ok) {
+          return { text: res.text, model, status: "ok" };
+        }
+        problems.push(res.detail);
+        if (res.fatal) {
+          // Credential-level failure: no Gemini model will work.
+          break gemini;
+        }
+        if (!res.retryable) {
+          // Model-specific rejection: skip retries, try the next model.
+          break;
+        }
+        if (attempt < ATTEMPTS_PER_MODEL) {
+          console.warn(`[generate] transient failure; retrying ${model} in ${RETRY_BACKOFF_MS / 1000}s`);
+          await sleep(RETRY_BACKOFF_MS);
+        }
+      }
     }
-    problems.push(res.detail);
   } else {
     problems.push("gemini skipped: GEMINI_API_KEY not set");
   }

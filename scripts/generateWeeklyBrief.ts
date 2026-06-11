@@ -68,8 +68,23 @@ async function storeIssue(params: {
   text: string;
   model: string;
   status: "draft" | "needs_review";
-}): Promise<string> {
+}): Promise<{ issueId: string; alreadySent: boolean }> {
   const db = supabaseAdmin();
+
+  // Sent issues are immutable to the pipeline: a re-run in the same week
+  // (manual retry, dry rehearsal, scheduler double-fire) must never downgrade
+  // or rewrite what subscribers already received. (Bug found 2026-06-10: a
+  // post-send dry run downgraded the sent issue to draft, 404ing the archive
+  // link in the delivered email.)
+  const { data: existing } = await db
+    .from("issues")
+    .select("id, status")
+    .eq("week_label", params.inputs.weekLabel)
+    .maybeSingle();
+  if (existing && existing.status === "sent") {
+    return { issueId: existing.id as string, alreadySent: true };
+  }
+
   const { data, error } = await db
     .from("issues")
     .upsert(
@@ -130,7 +145,7 @@ async function storeIssue(params: {
       console.error("[store] snapshot insert failed:", snapError.message);
     }
   }
-  return issueId;
+  return { issueId, alreadySent: false };
 }
 
 async function main(): Promise<void> {
@@ -150,6 +165,20 @@ async function main(): Promise<void> {
     }
     if (inputs.indicators.length === 0 && inputs.officialSummaries.length === 0) {
       throw new Error("no usable inputs collected — refusing to generate from nothing");
+    }
+
+    // Early exit BEFORE spending any generation: sent issues are immutable.
+    // (The same guard exists inside storeIssue as race protection.)
+    const { data: existingIssue } = await supabaseAdmin()
+      .from("issues")
+      .select("id, status")
+      .eq("week_label", inputs.weekLabel)
+      .maybeSingle();
+    if (existingIssue?.status === "sent") {
+      const detail = `issue ${inputs.weekLabel} already sent — no-op (sent issues are immutable)`;
+      await finishRun(runId, "success", detail, existingIssue.id as string);
+      console.log(`[weekly-brief] ${detail}`);
+      return;
     }
 
     // 2. Generate
@@ -175,7 +204,7 @@ async function main(): Promise<void> {
     });
 
     // 4. Store
-    const issueId = await storeIssue({
+    const stored = await storeIssue({
       inputs,
       subject: parsed.subject,
       markdown: parsed.markdown,
@@ -184,6 +213,13 @@ async function main(): Promise<void> {
       model: generation.model,
       status: "draft",
     });
+    if (stored.alreadySent) {
+      const detail = `issue ${inputs.weekLabel} already sent — no-op (sent issues are immutable)`;
+      await finishRun(runId, "success", detail, stored.issueId);
+      console.log(`[weekly-brief] ${detail}`);
+      return;
+    }
+    const issueId = stored.issueId;
     console.log(`[store] issue ${inputs.weekLabel} stored (${issueId})`);
 
     if (DRY_RUN) {

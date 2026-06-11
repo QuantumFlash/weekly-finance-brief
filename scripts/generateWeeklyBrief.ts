@@ -182,6 +182,11 @@ async function generateAndStore(
   const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
   const rendered = renderBrief(parsed.markdown, {
     weekLabel: inputs.weekLabel,
+    dateLabel: new Date().toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }),
     archiveUrl: `${baseUrl}/issues/${inputs.weekLabel}`,
     // Placeholder replaced per-recipient at send time (sendIssue.ts).
     unsubscribeUrl: `${baseUrl}/api/unsubscribe?email=PLACEHOLDER&token=PLACEHOLDER`,

@@ -120,9 +120,10 @@ export async function sendIssueEmail(params: {
     const unsubToken = generateUnsubscribeToken(recipient.email);
     const unsubUrl = `${baseUrl}/api/unsubscribe?email=${encodeURIComponent(recipient.email)}&token=${unsubToken}`;
     // Inject the per-recipient unsubscribe link into the footer.
+    // Tolerant of trailing attributes on the anchor (e.g. style="...").
     const personalHtml = params.html.replace(
-      /(<a href=")([^"]+)(">Unsubscribe<\/a>)/,
-      `$1${unsubUrl}$3`,
+      /(<a href=")([^"]+)("[^>]*>Unsubscribe<\/a>)/,
+      `$1${unsubUrl.replace(/&/g, "&amp;")}$3`,
     );
     const personalText = params.text.replace(
       /^Unsubscribe: .+$/m,

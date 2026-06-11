@@ -1,20 +1,29 @@
 # Weekly Finance Brief — Status
 
-**Updated:** 2026-06-11 (Session 4 — M5.1 shipped)
-**Current milestone:** 🚀 LIVE through M5.1 — modern UI, card-gated free trial, per-day delivery
-**State:** Dark/emerald redesign live at `http://localhost:3000`. Signup = email + delivery-day picker → **Stripe trial checkout (card required, $0 today, trial only for first-time customers — no trial farming)** → `/welcome` verification → branded welcome email. One issue generated per ISO week (Gemini free tier, retry ladder, CLI emergency fallback), delivered daily at 07:00 to whoever's day it is. All $0/month to run.
+**Updated:** 2026-06-11 (Session 5 — DEPLOYED)
+**Current milestone:** 🌍 LIVE IN PRODUCTION — fully hosted, runs without the local machine
+**Live site:** https://weekly-finance-brief.vercel.app
 
-## Verified this session
+## What's live and verified
 
-UI signup flow (day picker → profile day=5, trial exactly +7d) · welcome email delivered to inbox · deliverability bisected and fixed (no auth links in app emails; informational subjects) · day-change route with legacy-account fallback · daily scheduler registered · published-issue immutability intact.
+- **Site:** Vercel, auto-deploys on `git push` (repo `QuantumFlash/weekly-finance-brief`). All pages 200.
+- **Signup → trial:** card-gated Stripe checkout (7-day trial, $0 today, first-timers only). **Production signup verified live** — returns real checkout URL.
+- **Hosted cron:** GitHub Actions daily 07:00 CET on Node 22 — verified green. No machine dependency.
+- **Stripe webhook:** registered, keeps subscription state in sync.
+- **Generation:** Gemini free tier (retry ladder), $0, off the owner's Claude account.
+- **Market-ready extras:** rate limiting, one-click unsubscribe, Terms + Privacy pages.
 
-## How money works now
+## The 2 things that still need YOU (business, not code)
 
-Free trial (7 days, no card) → trial banner on /account with days left → $5/mo Stripe checkout (test mode) when ready. Entitled = Stripe active/trialing/past_due OR active trial.
+1. **Verify a Resend domain** (resend.com/domains) → then update `EMAIL_FROM` in Vercel + GitHub secret. **Until then, emails only reach you (the owner).** This is the single growth blocker — without it, new subscribers get no emails.
+2. **Switch Stripe to live keys** when ready for real money (currently test mode — checkout works but charges aren't real). Swap keys in Vercel, register a live webhook.
 
-## Standing items (none blocking)
+## Nice-to-have later
 
-- **Domain verification in Resend** is now THE growth unlock: until then only the owner's address receives mail (welcome + briefs alike) — signups from others record cleanly but their email fails in sandbox.
-- Rotation list unchanged: Resend key (priority), Gemini key, Supabase `sb_` pair, FRED/AV; delete unused Anthropic API key.
-- 2 moderate `npm audit` findings — review pre-public-deploy.
-- Public-deploy checklist: CLAUDE.md → Runbook.
+- Rotate keys that transited chat (Resend/Gemini/Supabase).
+- Node 20 deprecation warning on the GitHub Actions wrapper actions (cosmetic; bump checkout/setup-node to v4-latest before Sept 2026).
+- 2 moderate `npm audit` findings in scaffold deps.
+
+## Economics
+
+$0/month to run (Vercel Hobby, GitHub Actions, Supabase/Gemini/FRED free tiers, Resend free). Revenue: $5/mo Stripe subscription after 7-day trial.

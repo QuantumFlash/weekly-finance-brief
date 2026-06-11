@@ -69,13 +69,20 @@ Next.js app serves landing + auth + account + per-issue archive pages, plus API 
 
 Update checkboxes + `LOG.md` whenever a milestone lands.
 
-## Runbook (local-first launch)
+## Runbook (PRODUCTION — deployed 2026-06-11)
 
-- **Web app:** `npm start` serves the production build on `http://localhost:3000`. Auto-starts at logon via `WeeklyFinanceBrief-Web.cmd` in the user Startup folder. Log: `logs/web.log`.
-- **Weekly pipeline:** Windows scheduled task `WeeklyFinanceBrief-Pipeline`, Mondays 07:00 (catches up if the machine was off/asleep). Manual: `npm run brief:weekly`; rehearsal without sending: `npm run brief:dry`. Log: `logs/brief.log`.
-- **Migrations:** SQL files in `supabase/migrations/`, applied via the Supabase Dashboard SQL Editor (no CLI/access token on this machine). Status 2026-06-10: **0001 + 0002 not yet applied** — the app degrades gracefully until then (Stripe stays source of truth; waitlist/issues/ops persistence offline).
-- **Email reality:** Resend sandbox sender (`onboarding@resend.dev`) delivers only to the account owner until a domain is verified in Resend → that's the next step when a second subscriber exists.
-- **Public deploy checklist (when ready):** host the app (e.g. Vercel), set `APP_BASE_URL`, register the Stripe webhook (+`STRIPE_WEBHOOK_SECRET`), switch Stripe to live keys, verify a Resend domain + change `EMAIL_FROM`, add the production URL to Supabase Auth redirect allowlist, move the weekly job to hosted cron (`/schedule` or platform cron with `CRON_SECRET`).
+- **Live site:** https://weekly-finance-brief.vercel.app (Vercel, auto-deploys on `git push` to main via the GitHub connection). Project: `weekly-financial-brief/weekly-finance-brief`. Repo: `github.com/QuantumFlash/weekly-finance-brief`.
+- **Hosted cron:** GitHub Actions `.github/workflows/daily-brief.yml` runs daily 05:00 UTC (07:00 CET) on Node 22 — `npm ci` then the pipeline script. Secrets set in repo Settings → Secrets (Actions). Verified green 2026-06-11 (reused W24, 0 delivered on a non-delivery day). Manual run: Actions tab → Run workflow, or `gh workflow run daily-brief.yml`.
+- **Stripe webhook:** live endpoint `…/api/stripe/webhook` registered via API (`we_1Th0yeBLNSfFAnq81mLSJYi1`, test mode), `STRIPE_WEBHOOK_SECRET` in Vercel + `.env.local`. Events: `customer.subscription.*`, `invoice.paid/payment_failed`.
+- **Env vars:** in BOTH Vercel (runtime) and GitHub Actions (cron). ⚠ **NEVER pipe values to `vercel env add`/`gh secret set` from PowerShell 5.1 — it prepends a UTF-8 BOM (U+FEFF) that corrupts header values (`Cannot convert argument to a ByteString …65279`).** Use `gh secret set --body`, or Node `spawnSync(..., {input: Buffer.from(v,'utf8')})` for Vercel. Vercel marks them Sensitive (can't `env pull` plaintext — expected).
+- **Local dev:** `npm start` on `http://localhost:3000`; Startup-folder web launcher still present. Windows pipeline task `WeeklyFinanceBrief-Pipeline` is now **Disabled** (GitHub Actions is the cron). Manual pipeline: `npm run brief:weekly` / `brief:dry`.
+- **Migrations:** 0001+0002+0003 all applied (Supabase Dashboard SQL Editor). Supabase Auth redirect URLs include `https://*.vercel.app/auth/callback`.
+
+## Still needs Archi (business prerequisites, not code)
+
+1. **Resend domain** — until a domain is verified at resend.com/domains and `EMAIL_FROM` is updated (Vercel + GitHub secret), emails only deliver to the owner. THE growth blocker.
+2. **Stripe live keys** — currently test mode (`sk_test_`/`pk_test_`). For real charges: swap to live keys in Vercel, register a live-mode webhook, update `STRIPE_WEBHOOK_SECRET`.
+3. **Key rotation** — Resend/Gemini/Supabase keys transited chat; rotate when convenient.
 
 ## Security & secrets
 

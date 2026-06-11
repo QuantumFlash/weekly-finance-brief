@@ -2,6 +2,22 @@
 
 Running log: date, what changed, what's next. Newest first.
 
+## 2026-06-11 — Session 5: DEPLOYED TO PRODUCTION (Vercel + GitHub Actions cron)
+
+Done (everything I could without business prerequisites):
+- **Market-ready features** (commit be88a9e): in-memory rate limiting (5 signups/IP/hr), one-click unsubscribe (HMAC tokens, Stripe cancel-at-period-end, List-Unsubscribe header, /unsubscribe page), /terms + /privacy legal pages, footer links, GitHub Actions cron workflow, vercel.json, /api/cron/brief ack endpoint.
+- **Supabase Auth redirect URLs** added via dashboard: `https://*.vercel.app/auth/callback` + localhost (Total: 2).
+- **GitHub repo** created (`QuantumFlash/weekly-finance-brief`), pushed.
+- **Vercel deploy** live at https://weekly-finance-brief.vercel.app (via Vercel CLI; OAuth login by Archi). All pages 200.
+- **Stripe webhook** registered via API (test mode) → secret in Vercel + .env.local.
+- **GitHub Actions secrets** set via `gh` CLI (token Archi 2FA'd, used, then DELETED). Workflow **verified green** after two fixes: (1) Node 20→22 (Supabase realtime-js needs native WebSocket), (2) BOM in secrets.
+- **THE BOM SAGA:** PowerShell 5.1 prepends U+FEFF when piping to native CLIs → corrupted both GitHub secrets and Vercel env vars (`ByteString …65279` at runtime). Fixed GitHub with `gh secret set --body`; fixed Vercel with a Node helper writing `Buffer.from(v,'utf8')` to stdin. **Production signup now returns a real Stripe checkout URL — verified live.** Lesson written into CLAUDE.md.
+- Windows pipeline scheduled task **Disabled** (GitHub Actions is now the cron). Test users/customers cleaned up; temp script removed; duplicate .gitignore line fixed.
+
+State: fully hosted, $0/month, runs without the local machine. Test-mode Stripe + sandbox Resend remain (need Archi's domain + live keys).
+
+Next: Archi verifies a Resend domain (growth unlock) and switches Stripe to live keys when ready for real revenue.
+
 ## 2026-06-11 — Session 4 (cont.): card-gated free trial (anti-abuse)
 
 - Product decision (Archi): trials require a card to stop multi-account farming.

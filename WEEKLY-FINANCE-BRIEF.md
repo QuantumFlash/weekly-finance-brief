@@ -1,8 +1,8 @@
 # Weekly Finance Brief — Status
 
-**Updated:** 2026-06-11 (Session 4 — M5 shipped)
-**Current milestone:** 🚀 LIVE through M5 — modern UI, free trial, per-day delivery
-**State:** Dark/emerald redesign live at `http://localhost:3000`. Signup = email + delivery-day picker → 7-day card-less trial → branded welcome email (verified delivered). One issue generated per ISO week (Gemini free tier, retry ladder, CLI emergency fallback), delivered daily at 07:00 to whoever's day it is. All $0/month.
+**Updated:** 2026-06-11 (Session 4 — M5.1 shipped)
+**Current milestone:** 🚀 LIVE through M5.1 — modern UI, card-gated free trial, per-day delivery
+**State:** Dark/emerald redesign live at `http://localhost:3000`. Signup = email + delivery-day picker → **Stripe trial checkout (card required, $0 today, trial only for first-time customers — no trial farming)** → `/welcome` verification → branded welcome email. One issue generated per ISO week (Gemini free tier, retry ladder, CLI emergency fallback), delivered daily at 07:00 to whoever's day it is. All $0/month to run.
 
 ## Verified this session
 
